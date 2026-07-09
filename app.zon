@@ -1,0 +1,41 @@
+.{
+    .id = "dev.skillmanager.desktop",
+    .name = "skillmanager",
+    .display_name = "SkillManager",
+    .description = "Manage agent skills across project and global installs.",
+    .version = "0.1.0",
+    .platforms = .{"macos"},
+    .permissions = .{ "view", "command" },
+    .capabilities = .{ "native_views", "gpu_surfaces", "shortcuts" },
+    .shortcuts = .{
+        .{ .id = "skillmanager.refresh", .key = "r", .modifiers = .{"primary"} },
+        .{ .id = "skillmanager.install", .key = "n", .modifiers = .{"primary"} },
+        .{ .id = "skillmanager.search", .key = "f", .modifiers = .{"primary"} },
+    },
+    .shell = .{
+        .windows = .{
+            .{
+                .label = "main",
+                .title = "SkillManager",
+                .width = 1180,
+                .height = 760,
+                .min_width = 920,
+                .min_height = 620,
+                .restore_state = false,
+                .restore_policy = "center_on_primary",
+                .titlebar = "hidden_inset_tall",
+                .views = .{
+                    .{ .label = "skillmanager-canvas", .kind = "gpu_surface", .fill = true, .role = "SkillManager canvas", .accessibility_label = "SkillManager", .gpu_backend = "metal", .gpu_pixel_format = "bgra8_unorm", .gpu_present_mode = "timer", .gpu_alpha_mode = "opaque", .gpu_color_space = "srgb", .gpu_vsync = true },
+                },
+            },
+        },
+    },
+    .security = .{
+        .navigation = .{
+            .allowed_origins = .{ "zero://app", "zero://inline" },
+            .external_links = .{ .action = "deny" },
+        },
+    },
+    .web_engine = "system",
+    .cef = .{ .dir = "third_party/cef/macos", .auto_install = false },
+}

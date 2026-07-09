@@ -1,0 +1,4 @@
+.build/
+.native/
+zig-out/
+.DS_Store

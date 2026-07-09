@@ -1,0 +1,150 @@
+<stack>
+  <column background="background">
+    <row height="{header_height}" padding="12" gap="10" cross="center" background="surface" window-drag="true" label="SkillManager header">
+      <spacer width="{chrome_leading}" />
+      <search-field text="{search}" placeholder="Search skills..." width="320" on-input="search_edit" label="Search skills" />
+      <row gap="4" label="Scope filter">
+        <button size="sm" variant="{all_filter_variant}" on-press="select_all">All</button>
+        <button size="sm" variant="{project_filter_variant}" on-press="select_project">Project</button>
+        <button size="sm" variant="{global_filter_variant}" on-press="select_global">Global</button>
+      </row>
+      <spacer grow="1" />
+      <text size="sm" foreground="text_muted">{operation_label}</text>
+      <button variant="secondary" icon="refresh-cw" on-press="refresh" disabled="{operation_in_progress}">Refresh</button>
+      <button variant="primary" icon="plus" on-press="install" disabled="{install_controls_disabled}">Install</button>
+    </row>
+    <separator />
+    <split grow="1" value="{sidebar_split}" on-resize="sidebar_resized">
+      <column min-width="230" padding="12" gap="14" background="surface">
+        <column gap="8">
+          <text size="sm" foreground="text_muted">LIBRARY 01</text>
+          <list-item selected="{all_selected}" on-press="select_all" padding="8" gap="8" cross="center" label="All skills">
+            <text grow="1">ALL SKILLS</text>
+            <badge variant="secondary">{total_count}</badge>
+          </list-item>
+          <list-item selected="{project_selected}" on-press="select_project" padding="8" gap="8" cross="center" label="Project skills">
+            <icon name="folder" width="14" height="14" foreground="text_muted" />
+            <text grow="1">PROJECT</text>
+            <badge variant="secondary">{project_count}</badge>
+          </list-item>
+          <list-item selected="{global_selected}" on-press="select_global" padding="8" gap="8" cross="center" label="Global skills">
+            <text grow="1">GLOBAL</text>
+            <badge variant="secondary">{global_count}</badge>
+          </list-item>
+        </column>
+        <column gap="8">
+          <text size="sm" foreground="text_muted">AGENT 02</text>
+          <list-item selected="{agent_all_selected}" on-press="select_agent_all" padding="7" label="All agents"><text>ALL AGENTS</text></list-item>
+          <list-item selected="{agent_codex_selected}" on-press="select_agent_codex" padding="7" label="Codex agent"><text>CODEX</text></list-item>
+          <list-item selected="{agent_cursor_selected}" on-press="select_agent_cursor" padding="7" label="Cursor agent"><text>CURSOR</text></list-item>
+          <list-item selected="{agent_claude_selected}" on-press="select_agent_claude" padding="7" label="Claude Code agent"><text>CLAUDE-CODE</text></list-item>
+        </column>
+        <column gap="8">
+          <text size="sm" foreground="text_muted">INSTALL SOURCE 03</text>
+          <text-field text="{install_source}" placeholder="vercel-labs/agent-skills" on-input="source_edit" label="Skill source" />
+          <text-field text="{install_skill}" placeholder="skill name or path" on-input="install_skill_edit" label="Skill name" />
+          <row gap="8">
+            <button size="sm" variant="primary" on-press="install_project" disabled="{install_controls_disabled}" grow="1">Project</button>
+            <button size="sm" variant="outline" on-press="install_global" disabled="{install_controls_disabled}" grow="1">Global</button>
+          </row>
+        </column>
+        <spacer grow="1" />
+        <panel padding="10" background="surface_subtle" label="Project root">
+          <column gap="4">
+            <text size="sm" foreground="text_muted">PROJECT ROOT</text>
+            <text size="sm"><span mono="true">{project_root}</span></text>
+          </column>
+        </panel>
+      </column>
+      <split value="{list_split}" on-resize="list_resized">
+        <column min-width="300" padding="12" gap="8">
+          <if test="{has_error}">
+            <panel padding="10" background="surface_subtle" label="Operation error">
+              <column gap="4">
+                <text>{error_title}</text>
+                <text size="sm" foreground="text_muted">{error_detail}</text>
+              </column>
+            </panel>
+          </if>
+          <row gap="8" cross="center">
+            <text size="sm" foreground="text_muted" grow="1">{list_title}</text>
+            <badge variant="secondary">{visible_count}</badge>
+          </row>
+          <scroll grow="1" label="Skill list">
+            <column>
+              <for each="skill_rows" key="id" as="s">
+                <if test="{s.visible}">
+                  <list-item on-press="open_skill:{s.id}" selected="{s.active}" padding="10" label="{s.name}">
+                    <column gap="5" grow="1">
+                      <row gap="8" cross="center">
+                        <text grow="1" wrap="false">{s.name}</text>
+                        <badge variant="{s.scope_variant}">{s.scope}</badge>
+                      </row>
+                      <text size="sm" foreground="text_muted" wrap="false">{s.description}</text>
+                      <row gap="8" cross="center">
+                        <text size="sm" foreground="text_muted">{s.agent}</text>
+                      </row>
+                    </column>
+                  </list-item>
+                </if>
+              </for>
+              <else>
+                <panel padding="14" label="Empty skill list">
+                  <column gap="4">
+                    <text>No skills match this view</text>
+                    <text size="sm" foreground="text_muted">Change filters or install from a GitHub/local source.</text>
+                  </column>
+                </panel>
+              </else>
+            </column>
+          </scroll>
+        </column>
+        <column min-width="360" padding="18" gap="16">
+          <if test="{has_active_skill}">
+            <column gap="8">
+              <row cross="center" gap="8">
+                <text size="heading" grow="1">{active_name}</text>
+                <badge variant="{active_scope_variant}">{active_scope}</badge>
+              </row>
+              <text foreground="text_muted" wrap="true">{active_description}</text>
+            </column>
+            <panel padding="12" background="surface_subtle" label="Skill metadata">
+              <column gap="8">
+                <row gap="10"><text width="72" size="sm" foreground="text_muted">AGENT</text><text grow="1">{active_agent}</text></row>
+                <row gap="10"><text width="72" size="sm" foreground="text_muted">PATH</text><text grow="1"><span mono="true">{active_path}</span></text></row>
+                <row gap="10"><text width="72" size="sm" foreground="text_muted">SOURCE</text><text grow="1"><span mono="true">{active_source}</span></text></row>
+              </column>
+            </panel>
+            <row gap="8">
+              <button variant="secondary" icon="refresh-cw" on-press="update_active" disabled="{selection_controls_disabled}">Update</button>
+              <button variant="destructive" icon="trash" on-press="remove_active" disabled="{selection_controls_disabled}">Remove</button>
+              <button variant="outline" icon="folder" on-press="reveal_active">Reveal</button>
+            </row>
+          </if>
+          <else>
+            <column grow="1" main="center" cross="center" gap="10">
+              <text>Select a skill</text>
+              <text size="sm" foreground="text_muted">Manage project and global skills without a subprocess CLI.</text>
+            </column>
+          </else>
+          <separator />
+          <column gap="8">
+            <text size="sm" foreground="text_muted">ACTIVITY 04</text>
+            <for each="activity_rows" key="id" as="a">
+              <panel padding="10" background="surface_subtle" label="{a.title}">
+                <column gap="4">
+                  <row gap="8" cross="center">
+                    <icon name="{a.icon}" width="13" height="13" foreground="text_muted" />
+                    <text grow="1">{a.title}</text>
+                  </row>
+                  <text size="sm" foreground="text_muted" wrap="true">{a.detail}</text>
+                </column>
+              </panel>
+            </for>
+          </column>
+        </column>
+      </split>
+    </split>
+    <status-bar>{status_line}</status-bar>
+  </column>
+</stack>
