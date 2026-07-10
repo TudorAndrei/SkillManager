@@ -32,7 +32,7 @@ pub const Model = struct {
     io: ?std.Io = null,
     allocator: std.mem.Allocator = std.heap.page_allocator,
     home: []const u8 = ".",
-    search: []const u8 = "",
+    search_buffer: canvas.TextBuffer(256) = .{},
     all_filter_variant: []const u8 = "primary",
     project_filter_variant: []const u8 = "secondary",
     global_filter_variant: []const u8 = "secondary",
@@ -42,8 +42,8 @@ pub const Model = struct {
     agent_codex_selected: bool = true,
     agent_cursor_selected: bool = false,
     agent_claude_selected: bool = false,
-    install_source: []const u8 = "vercel-labs/agent-skills",
-    install_skill: []const u8 = "",
+    install_source_buffer: canvas.TextBuffer(1024) = .{},
+    install_skill_buffer: canvas.TextBuffer(512) = .{},
     project_root: []const u8 = ".",
     status_line: []const u8 = "Ready",
     has_error: bool = false,
@@ -77,7 +77,29 @@ pub const Model = struct {
     active_path: []const u8 = "",
     active_source: []const u8 = "",
 
-    pub const view_unbound = .{ "io", "allocator", "home", "scope_filter", "agent_filter", "active_skill_id" };
+    pub const view_unbound = .{
+        "io",
+        "allocator",
+        "home",
+        "scope_filter",
+        "agent_filter",
+        "active_skill_id",
+        "search_buffer",
+        "install_source_buffer",
+        "install_skill_buffer",
+    };
+
+    pub fn search(model: *const Model) []const u8 {
+        return model.search_buffer.text();
+    }
+
+    pub fn install_source(model: *const Model) []const u8 {
+        return model.install_source_buffer.text();
+    }
+
+    pub fn install_skill(model: *const Model) []const u8 {
+        return model.install_skill_buffer.text();
+    }
 };
 
 pub fn initialModel(allocator: std.mem.Allocator, io: std.Io, home: []const u8) Model {
@@ -86,6 +108,7 @@ pub fn initialModel(allocator: std.mem.Allocator, io: std.Io, home: []const u8) 
         .allocator = allocator,
         .home = home,
     };
+    model.install_source_buffer.set("vercel-labs/agent-skills");
     rescan(&model);
     return model;
 }
@@ -123,17 +146,17 @@ pub fn update(model: *Model, msg: Msg) void {
     switch (msg) {
         .search_edit => |event| {
             clearError(model);
-            model.search = textFromInput(event, model.search);
+            model.search_buffer.apply(event);
             applyFilters(model);
             model.status_line = "Search applied.";
         },
         .source_edit => |event| {
             clearError(model);
-            model.install_source = textFromInput(event, model.install_source);
+            model.install_source_buffer.apply(event);
         },
         .install_skill_edit => |event| {
             clearError(model);
-            model.install_skill = textFromInput(event, model.install_skill);
+            model.install_skill_buffer.apply(event);
         },
         .scope_changed => |value| {
             model.scope_filter = value;
@@ -191,15 +214,15 @@ fn installLocalSkill(model: *Model, scope: skill_paths.Scope) void {
 
 fn installFromCurrentSource(model: *Model, io: std.Io, agent: []const u8, scope: skill_paths.Scope) !skill_store.InstallResult {
     return skill_store.installLocal(model.allocator, io, .{
-        .source = model.install_source,
-        .skill_subpath = model.install_skill,
+        .source = model.install_source(),
+        .skill_subpath = model.install_skill(),
         .agent = agent,
         .scope = scope,
         .project_root = model.project_root,
         .home = model.home,
     }) catch |local_err| {
-        if (!looksLikeGithubSource(model.install_source)) return local_err;
-        const source = try github_source.parse(model.install_source, model.install_skill);
+        if (!looksLikeGithubSource(model.install_source())) return local_err;
+        const source = try github_source.parse(model.install_source(), model.install_skill());
         return skill_store.installGithub(model.allocator, io, .{
             .source = source,
             .agent = agent,
@@ -313,14 +336,6 @@ fn setActiveSkillByPath(model: *Model, path: []const u8) void {
     }
 }
 
-fn textFromInput(event: canvas.TextInputEvent, current: []const u8) []const u8 {
-    return switch (event) {
-        .insert_text => |text| text,
-        .clear => "",
-        else => current,
-    };
-}
-
 fn setScope(model: *Model, scope: []const u8) void {
     model.scope_filter = scope;
     model.all_selected = std.mem.eql(u8, scope, "all");
@@ -389,10 +404,11 @@ fn applyFilters(model: *Model) void {
             (model.project_selected and std.mem.eql(u8, row.scope, "Project")) or
             (model.global_selected and std.mem.eql(u8, row.scope, "Global"));
         const agent_matches = model.agent_all_selected or std.mem.eql(u8, row.agent, model.agent_filter);
-        const search_matches = model.search.len == 0 or
-            containsIgnoreCase(row.name, model.search) or
-            containsIgnoreCase(row.description, model.search) or
-            containsIgnoreCase(row.agent, model.search);
+        const search = model.search();
+        const search_matches = search.len == 0 or
+            containsIgnoreCase(row.name, search) or
+            containsIgnoreCase(row.description, search) or
+            containsIgnoreCase(row.agent, search);
         row.visible = has_row and scope_matches and agent_matches and search_matches;
 
         if (row.visible) {
@@ -501,6 +517,44 @@ fn emptySkillRow() SkillRow {
 }
 
 pub const default_activity_rows = [_]ActivityRow{
-    .{ .id = "native", .title = "Native SDK scaffold active", .detail = "The app uses app.zon, .native markup, and Zig model/update logic.", .icon = "check-circle", .color = "success" },
+    .{ .id = "native", .title = "Native bridge active", .detail = "The React frontend is connected to the in-process Zig model through policy-checked commands.", .icon = "check-circle", .color = "success" },
     .{ .id = "embedded", .title = "Embedded skill library planned", .detail = "Skill scanning and install/update/remove should run in-process, not through npx skills.", .icon = "terminal", .color = "text_muted" },
 };
+
+test "search edits accumulate and filter matching skills" {
+    var model = Model{};
+    model.skill_rows[0] = .{
+        .id = "frontend-design",
+        .name = "frontend-design",
+        .description = "Build polished interfaces.",
+        .scope = "Project",
+        .scope_variant = "secondary",
+        .agent = "codex",
+        .path_hint = "/tmp/frontend-design",
+        .source = "installed",
+        .active = false,
+        .visible = true,
+    };
+    model.skill_rows[1] = .{
+        .id = "find-docs",
+        .name = "find-docs",
+        .description = "Retrieve current documentation.",
+        .scope = "Global",
+        .scope_variant = "primary",
+        .agent = "claude-code",
+        .path_hint = "/tmp/find-docs",
+        .source = "installed",
+        .active = false,
+        .visible = true,
+    };
+
+    update(&model, .{ .search_edit = .{ .insert_text = "front" } });
+    try std.testing.expectEqualStrings("front", model.search());
+    try std.testing.expectEqual(@as(usize, 1), model.visible_count);
+    try std.testing.expect(model.skill_rows[0].visible);
+    try std.testing.expect(!model.skill_rows[1].visible);
+
+    update(&model, .{ .search_edit = .delete_backward });
+    try std.testing.expectEqualStrings("fron", model.search());
+    try std.testing.expectEqual(@as(usize, 1), model.visible_count);
+}

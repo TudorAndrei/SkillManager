@@ -6,36 +6,41 @@
     .version = "0.1.0",
     .platforms = .{"macos"},
     .permissions = .{ "view", "command" },
-    .capabilities = .{ "native_views", "gpu_surfaces", "shortcuts" },
-    .shortcuts = .{
-        .{ .id = "skillmanager.refresh", .key = "r", .modifiers = .{"primary"} },
-        .{ .id = "skillmanager.install", .key = "n", .modifiers = .{"primary"} },
-        .{ .id = "skillmanager.search", .key = "f", .modifiers = .{"primary"} },
+    .capabilities = .{ "webview", "js_bridge", "shortcuts" },
+    .bridge = .{
+        .commands = .{
+            .{ .name = "skillmanager.snapshot", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.search", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.scope", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.agent", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.select", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.refresh", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.install", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.discover", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.update", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.remove", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+        },
     },
-    .shell = .{
-        .windows = .{
-            .{
-                .label = "main",
-                .title = "SkillManager",
-                .width = 1180,
-                .height = 760,
-                .min_width = 920,
-                .min_height = 620,
-                .restore_state = false,
-                .restore_policy = "center_on_primary",
-                .titlebar = "hidden_inset_tall",
-                .views = .{
-                    .{ .label = "skillmanager-canvas", .kind = "gpu_surface", .fill = true, .role = "SkillManager canvas", .accessibility_label = "SkillManager", .gpu_backend = "metal", .gpu_pixel_format = "bgra8_unorm", .gpu_present_mode = "timer", .gpu_alpha_mode = "opaque", .gpu_color_space = "srgb", .gpu_vsync = true },
-                },
-            },
+    .frontend = .{
+        .dist = "frontend/dist",
+        .entry = "index.html",
+        .spa_fallback = true,
+        .dev = .{
+            .url = "http://127.0.0.1:5173/",
+            .command = .{ "npm", "--prefix", "frontend", "run", "dev", "--", "--host", "127.0.0.1" },
+            .ready_path = "/",
+            .timeout_ms = 30000,
         },
     },
     .security = .{
         .navigation = .{
-            .allowed_origins = .{ "zero://app", "zero://inline" },
+            .allowed_origins = .{ "zero://app", "http://127.0.0.1:5173" },
             .external_links = .{ .action = "deny" },
         },
     },
     .web_engine = "system",
     .cef = .{ .dir = "third_party/cef/macos", .auto_install = false },
+    .windows = .{
+        .{ .label = "main", .title = "SkillManager", .width = 1180, .height = 760, .min_width = 980, .min_height = 620, .restore_state = false },
+    },
 }

@@ -1,0 +1,37 @@
+amends "package://github.com/jdx/hk/releases/download/v1.50.0/hk@1.50.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.50.0/hk@1.50.0#/Builtins.pkl"
+
+local linters = new Mapping<String, Step> {
+    ["merge-conflict"] = Builtins.check_merge_conflict
+    ["trailing-whitespace"] = Builtins.trailing_whitespace
+    ["newlines"] = Builtins.newlines
+    ["large-files"] = Builtins.check_added_large_files
+    ["private-key"] = Builtins.detect_private_key
+    ["gitleaks"] = Builtins.gitleaks
+    ["oxfmt"] = (Builtins.oxfmt) {
+        glob = List("frontend/**/*.{ts,tsx,css,json,html}")
+    }
+    ["oxlint"] = (Builtins.ox_lint) {
+        glob = List("frontend/**/*.ts", "frontend/**/*.tsx")
+    }
+}
+
+hooks {
+    ["pre-commit"] {
+        fix = true
+        stash = "git"
+        steps = linters
+    }
+    ["fix"] {
+        fix = true
+        steps = linters
+    }
+    ["check"] {
+        steps = linters
+    }
+    ["commit-msg"] {
+        steps {
+            ["conventional-commit"] = Builtins.check_conventional_commit
+        }
+    }
+}

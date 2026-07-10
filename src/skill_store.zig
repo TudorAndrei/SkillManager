@@ -45,6 +45,11 @@ pub const InstallResult = struct {
     destination: []const u8,
 };
 
+pub const GithubSkillCandidate = struct {
+    path: []const u8,
+    name: []const u8,
+};
+
 pub const RemoveOptions = struct {
     skill_path: []const u8,
     agent: []const u8,
@@ -195,6 +200,62 @@ pub fn installGithub(allocator: std.mem.Allocator, io: std.Io, options: GithubIn
         .name = try allocator.dupe(u8, skill_name),
         .destination = destination,
     };
+}
+
+pub fn discoverGithubSkills(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    source: github_source.Source,
+    candidates: []GithubSkillCandidate,
+) !usize {
+    const tree_url = try github_source.treeApiUrl(allocator, source);
+    defer allocator.free(tree_url);
+    const tree_body = try fetchUrl(allocator, io, tree_url);
+    defer allocator.free(tree_body);
+
+    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, tree_body, .{});
+    defer parsed.deinit();
+    const tree = parsed.value.object.get("tree") orelse return error.InvalidGithubResponse;
+    if (tree != .array) return error.InvalidGithubResponse;
+
+    var count: usize = 0;
+    for (tree.array.items) |entry| {
+        if (count >= candidates.len) break;
+        if (entry != .object) continue;
+        const path_value = entry.object.get("path") orelse continue;
+        const type_value = entry.object.get("type") orelse continue;
+        if (path_value != .string or type_value != .string) continue;
+        if (!std.mem.eql(u8, type_value.string, "blob")) continue;
+        if (!std.mem.endsWith(u8, path_value.string, "SKILL.md")) continue;
+        if (path_value.string.len > "SKILL.md".len and path_value.string[path_value.string.len - "SKILL.md".len - 1] != '/') continue;
+
+        const relative_dir = std.mem.trim(u8, path_value.string[0 .. path_value.string.len - "SKILL.md".len], "/");
+        if (relative_dir.len == 0 and source.subpath.len == 0) continue;
+
+        const candidate_path = if (source.subpath.len == 0)
+            try allocator.dupe(u8, relative_dir)
+        else if (relative_dir.len == 0)
+            try allocator.dupe(u8, source.subpath)
+        else
+            try skill_paths.join(allocator, source.subpath, relative_dir);
+        errdefer allocator.free(candidate_path);
+
+        const candidate_name = if (relative_dir.len == 0)
+            std.fs.path.basename(source.subpath)
+        else
+            std.fs.path.basename(relative_dir);
+        if (candidate_name.len == 0) {
+            allocator.free(candidate_path);
+            continue;
+        }
+
+        candidates[count] = .{
+            .path = candidate_path,
+            .name = try allocator.dupe(u8, candidate_name),
+        };
+        count += 1;
+    }
+    return count;
 }
 
 pub fn removeInstalled(allocator: std.mem.Allocator, io: std.Io, options: RemoveOptions) !void {

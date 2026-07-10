@@ -2,11 +2,11 @@
 
 A Native SDK desktop app for managing agent skills across project and global installs.
 
-This project uses `vercel-labs/native`:
+This project uses `vercel-labs/native` with a React/Vite WebView frontend:
 
 - `app.zon` declares the native app shell.
-- `src/app.native` contains the declarative UI.
-- `src/main.zig` wires the Native SDK runner, window, theme, shortcuts, and markup.
+- `frontend/src` contains the React UI and shadcn-style components.
+- `src/main.zig` wires the Native SDK runner, WebView frontend, bridge commands, and model.
 - `src/model.zig` contains model state and update messages.
 
 ## Run
@@ -18,6 +18,9 @@ npm install -g @native-sdk/cli
 native dev
 ```
 
+`native dev` starts the Vite frontend automatically and serves the production bundle from
+`frontend/dist` for packaged builds.
+
 ## Commands
 
 ```sh
@@ -25,6 +28,18 @@ native check
 native test
 native dev
 ```
+
+## Git Hooks
+
+Install the mise-managed tools and hk hooks with:
+
+```sh
+mise install
+mise exec -- hk check --all
+```
+
+The hooks run repository hygiene checks plus gitleaks, oxlint, and oxfmt. Commit messages
+are checked against the conventional commit format.
 
 ## Embedded Skill Engine
 

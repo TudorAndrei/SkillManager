@@ -1,0 +1,12 @@
+[tools]
+hk = "latest"
+pkl = "latest"
+gitleaks = "latest"
+"npm:oxlint" = "latest"
+"npm:oxfmt" = "latest"
+
+[env]
+HK_MISE = 1
+
+[hooks]
+postinstall = "hk install --mise"
