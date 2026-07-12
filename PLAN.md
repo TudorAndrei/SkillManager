@@ -39,6 +39,13 @@ A release workflow will use semantic-release with Conventional Commits to decide
 - Run `mise install`, reinstall hooks with `hk install --mise`, run `hk check --all`, and test the conventional-commit validator with a valid Conventional Commit subject. Zizmor must pass without suppressions, including its immutable-action-reference and least-privilege checks.
 **Commit:** `chore(hooks): lint github actions security`
 
+### Phase 4: Repair release package jobs
+
+- Move the lockfile-backed Native SDK CLI installation into the release package matrix before any `./node_modules/.bin/native` command; the first GitHub run showed that the install existed only in the semantic-release job, causing both package jobs to fail.
+- Upgrade the pinned `actions/checkout` and `actions/setup-node` references to their current Node 24-based releases so GitHub no longer emits Node 20 action-runtime deprecation warnings.
+- Run actionlint, zizmor, and `hk check --all`, then push the repair and watch the Linux/macOS verification and release jobs to completion.
+**Commit:** `fix(ci): install native cli in release jobs`
+
 ## Risks & Tradeoffs
 
 - `ubuntu-latest` can change its available WebKitGTK package names or versions. Mitigation: install the explicit development packages required by the Native SDK system-WebView build and let `native doctor --strict` fail early with a useful log.

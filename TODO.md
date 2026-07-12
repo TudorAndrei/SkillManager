@@ -30,6 +30,15 @@
 - [x] Run `hk check --all`, including actionlint, and validate a Conventional Commit subject.
 - [x] Commit: `chore(hooks): lint github actions security`
 
+## Phase 4: Repair release package jobs
+
+- [x] Install the locked Native SDK CLI inside each release package matrix job.
+- [x] Remove the unused Native SDK CLI install from the semantic-release job.
+- [x] Upgrade checkout and setup-node to immutable Node 24-based action releases.
+- [x] Run actionlint, zizmor, and `hk check --all` after the workflow change.
+- [ ] Push the repair and verify Linux/macOS verification and release package jobs succeed.
+- [ ] Commit: `fix(ci): install native cli in release jobs`
+
 ## Verification
 
 - [x] `app.zon` validates with both declared package targets.
