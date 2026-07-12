@@ -43,6 +43,7 @@
 
 - [x] Add Zig `0.16.0` to both build matrices with `mlugg/setup-zig` pinned to an immutable commit.
 - [x] Install GTK4 and WebKitGTK 6.0 development packages on Linux, matching `native doctor --strict` requirements.
+- [x] Retain strict doctor on macOS and use normal doctor on Linux, where Native CLI `0.4.0` otherwise fails solely because macOS codesigning is unsupported.
 - [x] Run actionlint, zizmor, and `hk check --all` after the prerequisite changes.
 - [ ] Push and verify both GitHub-hosted matrices and both release archives.
 - [ ] Commit: `fix(ci): install native build prerequisites`
@@ -53,7 +54,7 @@
 - [x] `native check --strict` passes after the `app.zon` change.
 - [x] On macOS, the workflow produces an unsigned, runnable `SkillManager.app` archive containing `Contents/MacOS/skillmanager` and the `frontend/dist` assets.
 - [ ] On Linux, the workflow produces an install-tree archive containing `bin/skillmanager`, a `.desktop` launcher, and the packaged frontend assets.
-- [ ] Both matrix jobs pass `native test --yes` and `native doctor --manifest app.zon --strict`.
+- [ ] Both matrix jobs pass `native test --yes` and platform-appropriate doctor checks; macOS uses `--strict`, while Linux verifies all available prerequisites without failing on unsupported macOS codesigning.
 - [ ] A pull request run produces no retained artifacts.
 - [ ] A qualifying Conventional Commit on `main` creates a SemVer GitHub Release with exactly `SkillManager-linux-x64.tar.gz` and `SkillManager-macos-arm64.zip` assets.
 - [x] No macOS signing/notarization, Windows build, or Intel/cross-architecture build is introduced.

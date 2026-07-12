@@ -63,5 +63,9 @@ jobs:
           ./node_modules/.bin/native validate app.zon
           ./node_modules/.bin/native check --strict
           ./node_modules/.bin/native test --yes
-          ./node_modules/.bin/native doctor --manifest app.zon --strict
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ./node_modules/.bin/native doctor --manifest app.zon --strict
+          else
+            ./node_modules/.bin/native doctor --manifest app.zon
+          fi
           ./node_modules/.bin/native build --yes
