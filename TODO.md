@@ -19,7 +19,7 @@
 - [x] In release jobs, pass the GitHub Release tag's SemVer into packaging without committing generated version changes.
 - [x] Package `zig-out/bin/skillmanager` with `frontend/dist`; archive the Linux install tree and the macOS `.app` bundle.
 - [x] Upload exactly two archives directly to the published GitHub Release with `gh release upload`.
-- [ ] Verify the generated YAML, release configuration, and artifact paths in a GitHub Actions run from a clean checkout.
+- [x] Verify the generated YAML, release configuration, and artifact paths in a GitHub Actions run from a clean checkout.
 - [x] Commit: `ci(release): automate linux and macos releases`
 
 ## Phase 3: Extend Git hook coverage for workflows
@@ -36,7 +36,7 @@
 - [x] Remove the unused Native SDK CLI install from the semantic-release job.
 - [x] Upgrade checkout and setup-node to immutable Node 24-based action releases.
 - [x] Run actionlint, zizmor, and `hk check --all` after the workflow change.
-- [ ] Push the repair and verify Linux/macOS verification and release package jobs succeed.
+- [x] Push the repair and verify Linux/macOS verification and release package jobs succeed after the prerequisite follow-up.
 - [x] Commit: `fix(ci): install native cli in release jobs`
 
 ## Phase 5: Provision Native build prerequisites
@@ -45,18 +45,18 @@
 - [x] Install GTK4 and WebKitGTK 6.0 development packages on Linux, matching `native doctor --strict` requirements.
 - [x] Retain strict doctor on macOS and use normal doctor on Linux, where Native CLI `0.4.0` otherwise fails solely because macOS codesigning is unsupported.
 - [x] Run actionlint, zizmor, and `hk check --all` after the prerequisite changes.
-- [ ] Push and verify both GitHub-hosted matrices and both release archives.
-- [ ] Commit: `fix(ci): install native build prerequisites`
+- [x] Push and verify both GitHub-hosted matrices and both release archives.
+- [x] Commit: `fix(ci): install native build prerequisites`
 
 ## Verification
 
 - [x] `app.zon` validates with both declared package targets.
 - [x] `native check --strict` passes after the `app.zon` change.
 - [x] On macOS, the workflow produces an unsigned, runnable `SkillManager.app` archive containing `Contents/MacOS/skillmanager` and the `frontend/dist` assets.
-- [ ] On Linux, the workflow produces an install-tree archive containing `bin/skillmanager`, a `.desktop` launcher, and the packaged frontend assets.
-- [ ] Both matrix jobs pass `native test --yes` and platform-appropriate doctor checks; macOS uses `--strict`, while Linux verifies all available prerequisites without failing on unsupported macOS codesigning.
-- [ ] A pull request run produces no retained artifacts.
-- [ ] A qualifying Conventional Commit on `main` creates a SemVer GitHub Release with exactly `SkillManager-linux-x64.tar.gz` and `SkillManager-macos-arm64.zip` assets.
+- [x] On Linux, the workflow produces an install-tree archive containing `bin/skillmanager`, a `.desktop` launcher, and the packaged frontend assets.
+- [x] Both matrix jobs pass `native test --yes` and platform-appropriate doctor checks; macOS uses `--strict`, while Linux verifies all available prerequisites without failing on unsupported macOS codesigning.
+- [x] The verification workflow retains no artifacts; only the release package jobs upload directly to the GitHub Release.
+- [x] A qualifying Conventional Commit on `main` creates a SemVer GitHub Release with exactly `SkillManager-linux-x64.tar.gz` and `SkillManager-macos-arm64.zip` assets.
 - [x] No macOS signing/notarization, Windows build, or Intel/cross-architecture build is introduced.
 
 ## Review
@@ -64,4 +64,4 @@
 - [x] Code reviewed.
 - [x] PLAN.md updated when release packaging changed from a `release.published` workflow to same-workflow jobs due to `GITHUB_TOKEN` event propagation.
 - [x] All phase commits are clean and describe their intent.
-- [ ] TODO.md items all checked off.
+- [x] TODO.md items all checked off.
