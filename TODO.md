@@ -20,7 +20,7 @@
 - [x] Package `zig-out/bin/skillmanager` with `frontend/dist`; archive the Linux install tree and the macOS `.app` bundle.
 - [x] Upload exactly two archives directly to the published GitHub Release with `gh release upload`.
 - [ ] Verify the generated YAML, release configuration, and artifact paths in a GitHub Actions run from a clean checkout.
-- [ ] Commit: `ci(release): automate linux and macos releases`
+- [x] Commit: `ci(release): automate linux and macos releases`
 
 ## Phase 3: Extend Git hook coverage for workflows
 
@@ -28,7 +28,7 @@
 - [x] Add pinned `actionlint` and `zizmor` to `mise.toml` without changing existing frontend or secret-scanning tools.
 - [x] Run `mise install` and reinstall hooks with `hk install --mise`.
 - [x] Run `hk check --all`, including actionlint, and validate a Conventional Commit subject.
-- [ ] Commit: `chore(hooks): lint github actions security`
+- [x] Commit: `chore(hooks): lint github actions security`
 
 ## Verification
 
@@ -39,11 +39,11 @@
 - [ ] Both matrix jobs pass `native test --yes` and `native doctor --manifest app.zon --strict`.
 - [ ] A pull request run produces no retained artifacts.
 - [ ] A qualifying Conventional Commit on `main` creates a SemVer GitHub Release with exactly `SkillManager-linux-x64.tar.gz` and `SkillManager-macos-arm64.zip` assets.
-- [ ] No macOS signing/notarization, Windows build, or Intel/cross-architecture build is introduced.
+- [x] No macOS signing/notarization, Windows build, or Intel/cross-architecture build is introduced.
 
 ## Review
 
-- [ ] Code reviewed.
-- [ ] PLAN.md updated if the Native SDK packaging output differs from the expected archive layout.
-- [ ] All phase commits are clean and describe their intent.
+- [x] Code reviewed.
+- [x] PLAN.md updated when release packaging changed from a `release.published` workflow to same-workflow jobs due to `GITHUB_TOKEN` event propagation.
+- [x] All phase commits are clean and describe their intent.
 - [ ] TODO.md items all checked off.

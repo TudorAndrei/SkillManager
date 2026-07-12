@@ -2,6 +2,8 @@
 hk = "latest"
 pkl = "latest"
 gitleaks = "latest"
+actionlint = "1.7.12"
+zizmor = "1.26.1"
 "npm:oxlint" = "latest"
 "npm:oxfmt" = "latest"
 
