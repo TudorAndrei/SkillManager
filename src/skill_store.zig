@@ -4,6 +4,7 @@ const skill_manifest = @import("skill_manifest.zig");
 const skill_paths = @import("skill_paths.zig");
 
 pub const max_skills = 128;
+pub const max_projects = 64;
 const max_skill_file_bytes = 128 * 1024;
 
 pub const SkillRecord = struct {
@@ -21,6 +22,11 @@ pub const ScanResult = struct {
     total: usize = 0,
     project: usize = 0,
     global: usize = 0,
+};
+
+pub const ProjectRecord = struct {
+    path: []const u8 = "",
+    name: []const u8 = "",
 };
 
 pub const InstallOptions = struct {
@@ -97,6 +103,98 @@ pub fn scanInstalled(
         }
     }
     return result;
+}
+
+pub fn discoverProjects(allocator: std.mem.Allocator, io: std.Io, projects: *[max_projects]ProjectRecord) usize {
+    for (projects) |*project| project.* = .{};
+    var count: usize = 0;
+
+    const ancestors = [_][]const u8{ ".", "..", "../.." };
+    addProject(allocator, ".", projects, &count);
+    for (ancestors[1..]) |path| addProjectIfLocked(allocator, io, path, projects, &count);
+
+    // When SkillManager is launched from a workspace folder, inspect sibling repositories
+    // one level above the launch directory without walking the user's entire home directory.
+    discoverSiblingProjects(allocator, io, "..", projects, &count);
+    return count;
+}
+
+fn discoverSiblingProjects(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    parent_path: []const u8,
+    projects: *[max_projects]ProjectRecord,
+    count: *usize,
+) void {
+    if (count.* >= projects.len) return;
+    var parent = std.Io.Dir.cwd().openDir(io, parent_path, .{ .iterate = true }) catch return;
+    defer parent.close(io);
+
+    var iterator = parent.iterate();
+    while (iterator.next(io) catch null) |entry| {
+        if (count.* >= projects.len) return;
+        if (entry.kind != .directory) continue;
+        if (std.mem.eql(u8, entry.name, ".git") or
+            std.mem.eql(u8, entry.name, ".native") or
+            std.mem.eql(u8, entry.name, "node_modules") or
+            std.mem.eql(u8, entry.name, "worktrees")) continue;
+        const candidate = skill_paths.join(allocator, parent_path, entry.name) catch continue;
+        addProjectIfLocked(allocator, io, candidate, projects, count);
+        allocator.free(candidate);
+    }
+}
+
+fn addProjectIfLocked(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    projects: *[max_projects]ProjectRecord,
+    count: *usize,
+) void {
+    if (count.* >= projects.len or !hasProjectLock(io, path)) return;
+    for (projects[0..count.*]) |project| {
+        if (std.mem.eql(u8, project.path, path)) return;
+    }
+
+    addProject(allocator, path, projects, count);
+}
+
+fn addProject(
+    allocator: std.mem.Allocator,
+    path: []const u8,
+    projects: *[max_projects]ProjectRecord,
+    count: *usize,
+) void {
+    if (count.* >= projects.len) return;
+    for (projects[0..count.*]) |project| {
+        if (std.mem.eql(u8, project.path, path)) return;
+    }
+
+    const name = projectName(path);
+    projects[count.*] = .{
+        .path = allocator.dupe(u8, path) catch return,
+        .name = allocator.dupe(u8, name) catch return,
+    };
+    count.* += 1;
+}
+
+fn hasProjectLock(io: std.Io, path: []const u8) bool {
+    const json_lock = skill_paths.join(std.heap.page_allocator, path, "skills-lock.json") catch return false;
+    defer std.heap.page_allocator.free(json_lock);
+    if (std.Io.Dir.cwd().access(io, json_lock, .{})) |_| return true else |_| {}
+
+    const legacy_lock = skill_paths.join(std.heap.page_allocator, path, "skills.lock") catch return false;
+    defer std.heap.page_allocator.free(legacy_lock);
+    if (std.Io.Dir.cwd().access(io, legacy_lock, .{})) |_| return true else |_| {}
+    return false;
+}
+
+fn projectName(path: []const u8) []const u8 {
+    const trimmed = std.mem.trim(u8, path, "/");
+    if (std.mem.eql(u8, trimmed, ".") or trimmed.len == 0) return "Current project";
+    const basename = std.fs.path.basename(trimmed);
+    if (std.mem.eql(u8, basename, "..")) return "Parent project";
+    return basename;
 }
 
 fn hasSeenRoot(seen_roots: []const []const u8, root: []const u8) bool {

@@ -10,6 +10,7 @@
     .bridge = .{
         .commands = .{
             .{ .name = "skillmanager.snapshot", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
+            .{ .name = "skillmanager.project", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
             .{ .name = "skillmanager.search", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
             .{ .name = "skillmanager.scope", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },
             .{ .name = "skillmanager.agent", .origins = .{ "zero://app", "http://127.0.0.1:5173" } },

@@ -45,6 +45,8 @@ pub const Model = struct {
     install_source_buffer: canvas.TextBuffer(1024) = .{},
     install_skill_buffer: canvas.TextBuffer(512) = .{},
     project_root: []const u8 = ".",
+    projects: [skill_store.max_projects]skill_store.ProjectRecord = emptyProjects(),
+    project_total: usize = 0,
     status_line: []const u8 = "Ready",
     has_error: bool = false,
     error_title: []const u8 = "",
@@ -109,6 +111,7 @@ pub fn initialModel(allocator: std.mem.Allocator, io: std.Io, home: []const u8) 
         .home = home,
     };
     model.install_source_buffer.set("vercel-labs/agent-skills");
+    model.project_total = skill_store.discoverProjects(allocator, io, &model.projects);
     rescan(&model);
     return model;
 }
@@ -117,6 +120,7 @@ pub const Msg = union(enum) {
     search_edit: canvas.TextInputEvent,
     source_edit: canvas.TextInputEvent,
     install_skill_edit: canvas.TextInputEvent,
+    project_changed: []const u8,
     scope_changed: []const u8,
     agent_changed: []const u8,
     sidebar_resized: f32,
@@ -157,6 +161,12 @@ pub fn update(model: *Model, msg: Msg) void {
         .install_skill_edit => |event| {
             clearError(model);
             model.install_skill_buffer.apply(event);
+        },
+        .project_changed => |path| {
+            model.project_root = path;
+            clearError(model);
+            rescan(model);
+            model.status_line = "Project selected.";
         },
         .scope_changed => |value| {
             model.scope_filter = value;
@@ -499,6 +509,10 @@ fn updateControlState(model: *Model) void {
 
 fn emptySkillRows() [skill_store.max_skills]SkillRow {
     return [_]SkillRow{emptySkillRow()} ** skill_store.max_skills;
+}
+
+fn emptyProjects() [skill_store.max_projects]skill_store.ProjectRecord {
+    return [_]skill_store.ProjectRecord{.{}} ** skill_store.max_projects;
 }
 
 fn emptySkillRow() SkillRow {

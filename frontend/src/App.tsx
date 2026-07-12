@@ -35,6 +35,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type Skill = {
@@ -51,6 +58,8 @@ type Skill = {
 };
 
 type Snapshot = {
+  projects: Project[];
+  projectRoot: string;
   skills: Skill[];
   counts: { total: number; project: number; global: number; visible: number };
   filters: { search: string; scope: string; agent: string };
@@ -71,6 +80,7 @@ type Snapshot = {
 
 type Scope = "all" | "project" | "global";
 type Agent = "all" | "codex" | "cursor" | "claude-code";
+type Project = { path: string; name: string };
 
 type SkillCandidate = { path: string; name: string };
 type PendingInstall = { source: string; scope: Scope; agent: string };
@@ -86,6 +96,8 @@ declare global {
 }
 
 const emptySnapshot: Snapshot = {
+  projects: [],
+  projectRoot: ".",
   skills: [],
   counts: { total: 0, project: 0, global: 0, visible: 0 },
   filters: { search: "", scope: "all", agent: "codex" },
@@ -218,6 +230,7 @@ export default function App() {
 
   const chooseScope = (scope: Scope) => void run("skillmanager.scope", { value: scope });
   const chooseAgent = (agent: Agent) => void run("skillmanager.agent", { value: agent });
+  const chooseProject = (path: string) => void run("skillmanager.project", { path });
 
   const selectedInstallAgent = snapshot.filters.agent === "all" ? "codex" : snapshot.filters.agent;
 
@@ -329,7 +342,26 @@ export default function App() {
         <div className="workspace">
           <aside className="sidebar">
             <section className="sidebar-section">
-              <SectionLabel index="01" label="LIBRARY" />
+              <SectionLabel index="01" label="PROJECTS" />
+              {snapshot.projects.length > 0 ? (
+                <Select value={snapshot.projectRoot} onValueChange={chooseProject}>
+                  <SelectTrigger aria-label="Select project">
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {snapshot.projects.map((project) => (
+                      <SelectItem key={project.path} value={project.path}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="outline">No lockfile projects detected</Badge>
+              )}
+            </section>
+            <section className="sidebar-section">
+              <SectionLabel index="02" label="LIBRARY" />
               <ScopeButton
                 icon={Layers3}
                 label="All skills"
@@ -354,7 +386,7 @@ export default function App() {
             </section>
 
             <section className="sidebar-section">
-              <SectionLabel index="02" label="AGENT TARGET" />
+              <SectionLabel index="03" label="AGENT TARGET" />
               <AgentButton
                 icon={Bot}
                 label="All agents"
@@ -386,7 +418,7 @@ export default function App() {
             </section>
 
             <section className="sidebar-section install-section">
-              <SectionLabel index="03" label="INSTALL SOURCE" />
+              <SectionLabel index="04" label="INSTALL SOURCE" />
               <label className="field-label" htmlFor="source">
                 REPOSITORY OR PATH
               </label>
@@ -441,7 +473,7 @@ export default function App() {
             <div className="sidebar-footer">
               <div className="root-line">
                 <span>PROJECT ROOT</span>
-                <code>{"."}</code>
+                <code>{snapshot.projectRoot}</code>
               </div>
               <div className="root-line">
                 <span>ENGINE</span>

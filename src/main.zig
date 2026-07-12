@@ -11,6 +11,7 @@ pub const Model = model_mod.Model;
 
 const bridge_policies = [_]native_sdk.BridgeCommandPolicy{
     .{ .name = "skillmanager.snapshot", .origins = &.{ "zero://app", "http://127.0.0.1:5173" } },
+    .{ .name = "skillmanager.project", .origins = &.{ "zero://app", "http://127.0.0.1:5173" } },
     .{ .name = "skillmanager.search", .origins = &.{ "zero://app", "http://127.0.0.1:5173" } },
     .{ .name = "skillmanager.scope", .origins = &.{ "zero://app", "http://127.0.0.1:5173" } },
     .{ .name = "skillmanager.agent", .origins = &.{ "zero://app", "http://127.0.0.1:5173" } },
@@ -52,6 +53,7 @@ const SkillManagerApp = struct {
     fn bridge(self: *@This()) native_sdk.BridgeDispatcher {
         self.handlers = .{
             .{ .name = "skillmanager.snapshot", .context = self, .invoke_fn = handleSnapshot },
+            .{ .name = "skillmanager.project", .context = self, .invoke_fn = handleProject },
             .{ .name = "skillmanager.search", .context = self, .invoke_fn = handleSearch },
             .{ .name = "skillmanager.scope", .context = self, .invoke_fn = handleScope },
             .{ .name = "skillmanager.agent", .context = self, .invoke_fn = handleAgent },
@@ -95,6 +97,20 @@ fn payloadString(object: std.json.ObjectMap, name: []const u8) ![]const u8 {
 fn handleSnapshot(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     return writeSnapshot(&appFromContext(context).model, output);
+}
+
+fn handleProject(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const app = appFromContext(context);
+    const parsed = try parsePayload(app, invocation.request.payload);
+    defer parsed.deinit();
+    const path = try payloadString(try payloadObject(parsed.value), "path");
+    for (app.model.projects[0..app.model.project_total]) |project| {
+        if (std.mem.eql(u8, project.path, path)) {
+            model_mod.update(&app.model, .{ .project_changed = project.path });
+            return writeSnapshot(&app.model, output);
+        }
+    }
+    return error.UnknownProject;
 }
 
 fn handleSearch(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
@@ -242,7 +258,17 @@ fn setAgent(model: *Model, value: []const u8) !void {
 
 fn writeSnapshot(model: *const Model, output: []u8) ![]const u8 {
     var writer = std.Io.Writer.fixed(output);
-    try writer.writeAll("{\"skills\":[");
+    try writer.writeAll("{\"projects\":[");
+    for (model.projects[0..model.project_total], 0..) |project, index| {
+        if (index != 0) try writer.writeAll(",");
+        try writer.writeAll("{\"path\":");
+        try writeString(&writer, project.path);
+        try writePair(&writer, "name", project.name, false);
+        try writer.writeAll("}");
+    }
+    try writer.writeAll("],\"projectRoot\":");
+    try writeString(&writer, model.project_root);
+    try writer.writeAll(",\"skills\":[");
     var first = true;
     for (model.skill_rows) |row| {
         if (row.id.len == 0) continue;

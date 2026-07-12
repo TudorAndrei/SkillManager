@@ -54,7 +54,9 @@ Supported scan roots:
 - OpenCode global skills: `~/.config/opencode/skills`
 - Gemini CLI global skills: `~/.gemini/skills`
 
-Project scope currently resolves from the app launch directory. Global scope resolves from `HOME`.
+Project scope discovers repositories from `skills-lock.json` (and legacy `skills.lock`) in the
+launch directory, its ancestors, and sibling repositories. Without a lock file, it falls back
+to the app launch directory. Global scope resolves from `HOME`.
 
 ## Install Sources
 
