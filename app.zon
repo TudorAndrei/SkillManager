@@ -4,7 +4,7 @@
     .display_name = "SkillManager",
     .description = "Manage agent skills across project and global installs.",
     .version = "0.1.0",
-    .platforms = .{"macos"},
+    .platforms = .{ "macos", "linux" },
     .permissions = .{ "view", "command" },
     .capabilities = .{ "webview", "js_bridge", "shortcuts" },
     .bridge = .{
