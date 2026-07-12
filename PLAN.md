@@ -48,7 +48,7 @@ A release workflow will use semantic-release with Conventional Commits to decide
 
 ### Phase 5: Provision Native build prerequisites
 
-- Install Zig `0.16.0` on both matrix hosts with `mlugg/setup-zig`, pinned to the immutable commit for `v2.2.1`; the second GitHub run showed that `native doctor --strict` requires `zig` on `PATH` even though the Native SDK can provision Zig internally for tests.
+- Install Zig `0.16.0` on both matrix hosts from `mise.toml` with `jdx/mise-action`, pinned to the immutable commit for the Node 24-native `v4.2.0` release; the second GitHub run showed that `native doctor --strict` requires `zig` on `PATH` even though the Native SDK can provision Zig internally for tests.
 - Replace the obsolete GTK3/WebKitGTK 4.1 Ubuntu packages with GTK4 and WebKitGTK 6.0 development packages, matching the Native SDK doctor output on the current `ubuntu-latest` image.
 - Keep strict doctor validation on macOS, but use normal doctor validation on Linux because Native CLI `0.4.0` treats the expected `codesign: unsupported` platform status as a strict failure even when Zig, GTK4, WebKitGTK 6.0, and the configured system WebView are all available.
 - Run actionlint, zizmor, and `hk check --all`, then push and verify both matrices and the two release archives from GitHub-hosted runners.

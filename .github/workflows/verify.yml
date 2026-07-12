@@ -32,9 +32,9 @@ jobs:
         with:
           node-version: 24
 
-      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
-          version: 0.16.0
+          install_args: zig
 
       - name: Install locked Native SDK CLI
         run: npm ci --ignore-scripts

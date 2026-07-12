@@ -41,7 +41,7 @@
 
 ## Phase 5: Provision Native build prerequisites
 
-- [x] Add Zig `0.16.0` to both build matrices with `mlugg/setup-zig` pinned to an immutable commit.
+- [x] Add Zig `0.16.0` to `mise.toml` and both build matrices with the Node 24-native `jdx/mise-action` pinned to an immutable commit.
 - [x] Install GTK4 and WebKitGTK 6.0 development packages on Linux, matching `native doctor --strict` requirements.
 - [x] Retain strict doctor on macOS and use normal doctor on Linux, where Native CLI `0.4.0` otherwise fails solely because macOS codesigning is unsupported.
 - [x] Run actionlint, zizmor, and `hk check --all` after the prerequisite changes.
