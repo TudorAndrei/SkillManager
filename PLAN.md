@@ -46,6 +46,13 @@ A release workflow will use semantic-release with Conventional Commits to decide
 - Run actionlint, zizmor, and `hk check --all`, then push the repair and watch the Linux/macOS verification and release jobs to completion.
 **Commit:** `fix(ci): install native cli in release jobs`
 
+### Phase 5: Provision Native build prerequisites
+
+- Install Zig `0.16.0` on both matrix hosts with `mlugg/setup-zig`, pinned to the immutable commit for `v2.2.1`; the second GitHub run showed that `native doctor --strict` requires `zig` on `PATH` even though the Native SDK can provision Zig internally for tests.
+- Replace the obsolete GTK3/WebKitGTK 4.1 Ubuntu packages with GTK4 and WebKitGTK 6.0 development packages, matching the Native SDK doctor output on the current `ubuntu-latest` image.
+- Run actionlint, zizmor, and `hk check --all`, then push and verify both matrices and the two release archives from GitHub-hosted runners.
+**Commit:** `fix(ci): install native build prerequisites`
+
 ## Risks & Tradeoffs
 
 - `ubuntu-latest` can change its available WebKitGTK package names or versions. Mitigation: install the explicit development packages required by the Native SDK system-WebView build and let `native doctor --strict` fail early with a useful log.

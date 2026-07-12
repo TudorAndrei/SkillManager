@@ -37,7 +37,15 @@
 - [x] Upgrade checkout and setup-node to immutable Node 24-based action releases.
 - [x] Run actionlint, zizmor, and `hk check --all` after the workflow change.
 - [ ] Push the repair and verify Linux/macOS verification and release package jobs succeed.
-- [ ] Commit: `fix(ci): install native cli in release jobs`
+- [x] Commit: `fix(ci): install native cli in release jobs`
+
+## Phase 5: Provision Native build prerequisites
+
+- [x] Add Zig `0.16.0` to both build matrices with `mlugg/setup-zig` pinned to an immutable commit.
+- [x] Install GTK4 and WebKitGTK 6.0 development packages on Linux, matching `native doctor --strict` requirements.
+- [x] Run actionlint, zizmor, and `hk check --all` after the prerequisite changes.
+- [ ] Push and verify both GitHub-hosted matrices and both release archives.
+- [ ] Commit: `fix(ci): install native build prerequisites`
 
 ## Verification
 
