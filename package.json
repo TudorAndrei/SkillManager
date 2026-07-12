@@ -1,0 +1,7 @@
+{
+  "name": "skillmanager-automation",
+  "private": true,
+  "devDependencies": {
+    "@native-sdk/cli": "0.4.0"
+  }
+}
