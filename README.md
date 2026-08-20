@@ -13,7 +13,28 @@ behaviour. The UI shows the exact command before it runs and streams the real ou
 - `electron/preload` exposes one request function and one output stream. Nothing else.
 - `frontend/src` contains the React UI and its shadcn-style components.
 
-## Run
+## Install
+
+macOS on Apple Silicon, with Homebrew. This repository is its own tap:
+
+```sh
+brew tap tudorandrei/skillmanager https://github.com/TudorAndrei/SkillManager
+brew install --cask --no-quarantine skillmanager
+```
+
+The app is not signed or notarized by Apple, so macOS quarantines it.
+`--no-quarantine` avoids that. Without the flag, open the installed app once from
+the Finder context menu and confirm.
+
+The cask carries the app with its own copy of the skills CLI and the Node runtime it needs, so
+nothing else has to be installed. `Casks/skillmanager.rb` is updated by the release workflow, so
+`brew upgrade --cask skillmanager` follows each release.
+
+Linux users take `SkillManager-linux-x64.tar.gz` from the
+[releases page](https://github.com/TudorAndrei/SkillManager/releases). Homebrew has no cask support
+on Linux.
+
+## Run from source
 
 ```sh
 npm install                        # tooling
