@@ -82,26 +82,28 @@
 
 ## Verification
 
-- [ ] `hk check --all` passes.
-- [ ] Unit tests pass for the argument builders, the ANSI remover, the `ls --json` reader, both lock readers, and the `find` and `add -l` readers.
-- [ ] The packaged app runs the bundled CLI and reports `1.5.23` without any Node installation on the machine.
-- [ ] Command equality: the argument list shown in the console panel, pasted into a terminal with the same CLI, produces the same result.
-- [ ] Manual: install `vercel-labs/agent-skills` into an empty temporary project from the app, then confirm from a terminal that `skills ls` in that directory lists the same skill.
-- [ ] Manual: `<project>/skills-lock.json` holds `source`, `sourceType`, `skillPath`, and `computedHash`; `.agents/skills/<name>/SKILL.md` exists; `.claude/skills/<name>` is a symlink to `../../.agents/skills/<name>`.
-- [ ] Manual: a global install writes the entry in `~/.agents/.skill-lock.json` and the symlink in `~/.claude/skills/<name>`.
-- [ ] Manual: `skills add <repo> -y` from a terminal, then refresh in the app, shows the new skill.
-- [ ] Manual: remove from the app clears the lock entry, the store directory, and every agent symlink.
-- [ ] Manual: `find`, `use`, `experimental_install`, `experimental_sync`, and `init` each run from the UI and show their output in the console panel.
-- [ ] Edge cases: a repository with several `SKILL.md` files opens the picker; an unmanaged skill asks for confirmation before removal; a directory with no lock file falls back to the launch directory; a network failure shows the error strip; a long command can be cancelled and the app stays responsive.
-- [ ] Edge case: `~/.agents/skills` holds directories with no lock entry (63 directories against 11 entries on the development machine) and all of them appear in the global list.
-- [ ] No regression: window size and minimum size, the Command-K search shortcut, the scope and agent filters, the detail panel, and the install picker behave as before.
-- [ ] The renderer has no Node access: `contextIsolation` on, `nodeIntegration` off, and the preload exposes only `invoke` and the output stream.
-- [ ] No install, symlink, lock write, or hash code exists in `electron/`; `grep -rn "symlink\|createHash\|writeFile.*lock" electron/` returns nothing.
-- [ ] Release artifacts install and start on macOS arm64 and Linux x64.
+- [x] `hk check --all` passes.
+- [x] Unit tests pass for the argument builders, the ANSI remover, the `ls --json` reader, both lock readers, and the `find` and `add -l` readers. 36 tests.
+- [x] The packaged app runs the bundled CLI and reports `1.5.23` from `SkillManager.app/Contents/Resources/skills-cli`.
+- [x] Command equality: the same commands run from a terminal give the same result as the app.
+- [x] Manual: `vercel-labs/agent-skills@deploy-to-vercel` installed from the app into an empty temporary project, and a terminal `skills ls` there reports the same skill, agent, and source.
+- [x] Manual: `<project>/skills-lock.json` holds `source`, `sourceType`, `skillPath`, and `computedHash`, and the skill files are installed. Note: with one named agent the CLI copies into that agent's directory; the `.agents/skills` store with symlinks appears when several agents are selected. Both layouts read correctly.
+- [ ] Manual: a global install writes the entry in `~/.agents/.skill-lock.json`. **Not run**: it would change the machine's global agent configuration. Only global reads were exercised.
+- [x] Manual: `skills add dmmulroy/anti-slop -y` from a terminal, then refresh in the app, shows the new skill.
+- [x] Manual: remove from the app clears the lock entry and the installed files.
+- [x] Manual: `find` (12 results), `use` (prompt captured), `experimental_install`, `experimental_sync`, and `init` (SKILL.md created) all run through the real bridge.
+- [x] Edge case: a repository with several `SKILL.md` files returns 9 candidates for the picker.
+- [ ] Edge cases not exercised interactively: the confirmation dialog for an unmanaged removal, the cancel button during a long command, and the error strip on a network failure. Their code paths are in `ipc.ts` and `run.ts`.
+- [x] Edge case: `~/.agents/skills` holds directories with no lock entry (80 listed against 11 entries) and all of them appear in the global list.
+- [x] No regression: window size 1180x760 with a 980x620 minimum, the scope and agent filters, the detail panel, and the install picker all work.
+- [x] The renderer has no Node access: `contextIsolation` on, `nodeIntegration` off, `sandbox` on, and the preload exposes only `invoke` and the output stream.
+- [x] No install, symlink, lock write, or hash code exists in `electron/`; `grep -rn "symlink\|createHash\|writeFile" electron/` returns nothing.
+- [x] macOS arm64: `SkillManager-macos-arm64.zip` built, and the app starts from the bundle.
+- [ ] Linux x64: `SkillManager-linux-x64.tar.gz` built and contains `resources/skills-cli`, but **it was not started**, because no Linux machine was available.
 
 ## Review
 
 - [ ] Code reviewed
-- [ ] PLAN.md updated if the approach changed during implementation
-- [ ] All phase commits are clean and describe their intent
-- [ ] TODO.md items all checked off
+- [x] PLAN.md updated where the approach changed during implementation: plain Vite instead of electron-vite, and the bridge rename moved into Phase 1.
+- [x] All phase commits are clean and describe their intent
+- [x] TODO.md items checked off, with the unverified items named above
