@@ -36,13 +36,15 @@
 
 ## Phase 3: Install, update, and remove through the CLI
 
-- [ ] Add `electron/main/cli/args.ts` builders: `add <source> -y --skill <names> --agent <agents>` with `-g` or `-p`, `remove -y -s <name>`, `update -y [name]`.
-- [ ] Run `skills add -l` for repositories with several skills and parse the candidates after ANSI removal.
-- [ ] Fail soft on a parse failure: show the raw output and offer manual entry or `--skill '*'`.
-- [ ] Confirm every result with an `ls --json` refresh and a lock re-read, never from command text.
-- [ ] Wire `skillmanager.install`, `.discover`, `.update`, and `.remove` in `ipc.ts`.
-- [ ] Add a confirmation step before removing a skill that has no lock entry.
-- [ ] Add unit tests for every argument builder and for the `add -l` reader.
+- [x] Add `electron/main/cli/args.ts` builders: `add <source> -y --skill <names> --agent <agents>` with `-g` or `-p`, `remove -y -s <name>`, `update -y [name]`.
+- [x] Read the valid agent identifiers from the CLI itself, because `ls --json` reports display names and `--agent` takes identifiers.
+- [x] Run `skills add -l` for repositories with several skills and parse the candidates after ANSI removal.
+- [x] Fail soft on a parse failure: an empty candidate list installs with `--skill '*'` instead of guessing.
+- [x] Confirm every result with an `ls --json` refresh and a lock re-read, never from command text.
+- [x] Wire `skillmanager.install`, `.discover`, `.update`, and `.remove` in `ipc.ts`.
+- [x] Add a confirmation step before removing a skill that has no lock entry.
+- [x] Add unit tests for every argument builder, the `add -l` reader, and the agent identifier mapping.
+- [x] Exercise install, update, discover, and remove through the real bridge in a temporary project.
 - [ ] Commit: `feat(skills): install, update, and remove through the bundled cli`
 
 ## Phase 4: Cover the remaining CLI commands

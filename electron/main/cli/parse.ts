@@ -38,3 +38,49 @@ export function formatCommandLine(args: string[]): string {
   );
   return ["skills", ...quoted].join(" ");
 }
+
+export interface RepoSkill {
+  name: string;
+  description: string;
+}
+
+const SKILL_NAME = /^[a-z0-9][a-z0-9._-]*$/i;
+
+/**
+ * Read the candidate list of `skills add <source> -l`.
+ *
+ * This output is human text, so it is used only to offer a choice. What is
+ * installed always comes from `ls --json` afterwards. A format change makes
+ * this return nothing, and the caller then shows the raw output instead.
+ */
+export function parseRepoSkills(text: string): RepoSkill[] {
+  const skills: RepoSkill[] = [];
+  for (const raw of cleanOutput(text).split("\n")) {
+    const line = raw.replace(/^[│|]\s?/, "");
+    const content = line.trim();
+    if (content.length === 0) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent <= 4) {
+      if (SKILL_NAME.test(content)) skills.push({ name: content, description: "" });
+      continue;
+    }
+    const current = skills[skills.length - 1];
+    if (current === undefined) continue;
+    current.description =
+      current.description === "" ? content : `${current.description} ${content}`;
+  }
+  return skills;
+}
+
+/** The valid agent identifiers, which the CLI prints when one is rejected. */
+export function parseValidAgents(text: string): string[] {
+  const line = cleanOutput(text)
+    .split("\n")
+    .find((candidate) => candidate.includes("Valid agents:"));
+  if (line === undefined) return [];
+  return line
+    .slice(line.indexOf("Valid agents:") + "Valid agents:".length)
+    .split(",")
+    .map((agent) => agent.trim())
+    .filter((agent) => agent.length > 0);
+}

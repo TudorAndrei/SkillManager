@@ -88,7 +88,8 @@ type Scope = "all" | "project" | "global";
 type Agent = string;
 type Project = { path: string; name: string };
 
-type SkillCandidate = { path: string; name: string };
+/** One entry of `skills add <source> -l`. The name is what `--skill` takes. */
+type SkillCandidate = { name: string; description: string };
 type PendingInstall = { source: string; scope: Scope; agent: string };
 
 type DiscoveryResult = { candidates: SkillCandidate[] };
@@ -300,8 +301,8 @@ export default function App() {
         source: installSource,
       });
       if (result.candidates.length === 1) {
-        setSkillPath(result.candidates[0].path);
-        await run("skillmanager.install", { ...payload, skill: result.candidates[0].path });
+        setSkillPath(result.candidates[0].name);
+        await run("skillmanager.install", { ...payload, skill: result.candidates[0].name });
       } else if (result.candidates.length > 1) {
         setCandidates(result.candidates);
         setPendingInstall({
@@ -330,10 +331,10 @@ export default function App() {
 
   const installCandidate = (candidate: SkillCandidate) => {
     if (!pendingInstall) return;
-    setSkillPath(candidate.path);
+    setSkillPath(candidate.name);
     const payload = {
       source: pendingInstall.source,
-      skill: candidate.path,
+      skill: candidate.name,
       scope: pendingInstall.scope,
       agent: pendingInstall.agent,
     };
@@ -463,13 +464,13 @@ export default function App() {
                 disabled={busy}
               />
               <label className="field-label" htmlFor="skill-path">
-                SKILL SUBPATH <span>OPTIONAL</span>
+                SKILL NAME <span>OPTIONAL</span>
               </label>
               <Input
                 id="skill-path"
                 value={skillPath}
                 onChange={(event) => setSkillPath(event.target.value)}
-                placeholder="skills/my-skill"
+                placeholder="my-skill, or empty for every skill"
                 disabled={busy}
               />
               <div className="install-scope-toggle" role="group" aria-label="Install scope">
@@ -692,7 +693,7 @@ export default function App() {
               <button
                 type="button"
                 className="skill-picker-option"
-                key={candidate.path}
+                key={candidate.name}
                 onClick={() => installCandidate(candidate)}
               >
                 <span className="skill-picker-icon">
@@ -700,7 +701,7 @@ export default function App() {
                 </span>
                 <span className="skill-picker-copy">
                   <strong>{candidate.name}</strong>
-                  <code>{candidate.path}</code>
+                  <code>{candidate.description}</code>
                 </span>
                 <ChevronRight size={16} className="skill-picker-arrow" />
               </button>
