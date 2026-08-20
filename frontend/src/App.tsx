@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConsolePanel, type ConsoleLine } from "@/components/ConsolePanel";
 import { cn } from "@/lib/utils";
 
 type Skill = {
@@ -87,10 +88,15 @@ type PendingInstall = { source: string; scope: Scope; agent: string };
 
 type DiscoveryResult = { candidates: SkillCandidate[] };
 
+type OutputChunk = { stream: "stdout" | "stderr"; text: string };
+
+type VersionInfo = { app: string; cli: string; cliPath: string; pinned: string };
+
 declare global {
   interface Window {
-    zero?: {
+    skillmanager?: {
       invoke: (command: string, payload?: unknown) => Promise<unknown>;
+      onOutput: (listener: (chunk: OutputChunk) => void) => () => void;
     };
   }
 }
@@ -142,9 +148,9 @@ function useNativeBridge() {
     command: string,
     payload?: unknown,
   ): Promise<T> {
-    if (!window.zero?.invoke)
-      throw new Error("Native bridge unavailable. Start the app with native dev.");
-    return (await window.zero.invoke(command, payload)) as T;
+    if (!window.skillmanager?.invoke)
+      throw new Error("Bridge unavailable. Start the app with npm run dev.");
+    return (await window.skillmanager.invoke(command, payload)) as T;
   }, []);
   return request;
 }
@@ -163,6 +169,10 @@ export default function App() {
   const [pendingInstall, setPendingInstall] = useState<PendingInstall | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchSequence = useRef(0);
+  const [consoleLines, setConsoleLines] = useState<ConsoleLine[]>([]);
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [version, setVersion] = useState<VersionInfo | null>(null);
+  const consoleSequence = useRef(0);
 
   const applySnapshot = useCallback((next: Snapshot) => {
     setSnapshot(next);
@@ -181,6 +191,26 @@ export default function App() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const unsubscribe = window.skillmanager?.onOutput((chunk) => {
+      setConsoleLines((lines) => {
+        const next = [...lines, { id: (consoleSequence.current += 1), ...chunk }];
+        return next.length > 400 ? next.slice(next.length - 400) : next;
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setVersion(await request<VersionInfo>("skillmanager.version"));
+      } catch {
+        setVersion(null);
+      }
+    })();
+  }, [request]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -477,7 +507,7 @@ export default function App() {
               </div>
               <div className="root-line">
                 <span>ENGINE</span>
-                <code>EMBEDDED / ZIG</code>
+                <code>{version ? `SKILLS CLI ${version.cli}` : "SKILLS CLI"}</code>
               </div>
             </div>
           </aside>
@@ -626,6 +656,14 @@ export default function App() {
             </div>
           </aside>
         </div>
+        <ConsolePanel
+          lines={consoleLines}
+          open={consoleOpen}
+          busy={busy}
+          onToggle={() => setConsoleOpen((open) => !open)}
+          onClear={() => setConsoleLines([])}
+          onCancel={() => void request("skillmanager.cancel")}
+        />
       </main>
       <Dialog
         open={pickerOpen}

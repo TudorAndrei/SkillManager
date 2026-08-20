@@ -1,0 +1,9 @@
+{
+  "name": "skillmanager-vendor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pinned skills CLI that ships inside the SkillManager package.",
+  "dependencies": {
+    "skills": "1.5.23"
+  }
+}
