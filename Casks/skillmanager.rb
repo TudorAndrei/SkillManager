@@ -1,6 +1,6 @@
 cask "skillmanager" do
-  version "1.1.0"
-  sha256 "92063f8f3cbe985541d2525a7337377119004d392e542b7f79296afc2ba01ef6"
+  version "1.2.0"
+  sha256 "61b4b3c85ab85aa71e0b8e0b6585bbfc03229cf80505cb442d89298c1f5c4c9b"
 
   url "https://github.com/TudorAndrei/SkillManager/releases/download/v#{version}/SkillManager-macos-arm64.zip",
       verified: "github.com/TudorAndrei/SkillManager/"
