@@ -62,6 +62,7 @@ type Snapshot = {
   projects: Project[];
   projectRoot: string;
   skills: Skill[];
+  agents: string[];
   counts: { total: number; project: number; global: number; visible: number };
   filters: { search: string; scope: string; agent: string };
   active: string | null;
@@ -73,6 +74,9 @@ type Snapshot = {
     agent: string;
     path: string;
     source: string;
+    managed: boolean;
+    hash: string;
+    updatedAt: string;
   } | null;
   status: string;
   operation: { inProgress: boolean; label: string };
@@ -80,7 +84,8 @@ type Snapshot = {
 };
 
 type Scope = "all" | "project" | "global";
-type Agent = "all" | "codex" | "cursor" | "claude-code";
+/** Agent names come from `skills ls --json`, so the list follows the CLI. */
+type Agent = string;
 type Project = { path: string; name: string };
 
 type SkillCandidate = { path: string; name: string };
@@ -105,8 +110,9 @@ const emptySnapshot: Snapshot = {
   projects: [],
   projectRoot: ".",
   skills: [],
+  agents: [],
   counts: { total: 0, project: 0, global: 0, visible: 0 },
-  filters: { search: "", scope: "all", agent: "codex" },
+  filters: { search: "", scope: "all", agent: "all" },
   active: null,
   detail: null,
   status: "Connecting to native engine...",
@@ -117,18 +123,18 @@ const emptySnapshot: Snapshot = {
 const activity = [
   {
     icon: ShieldCheck,
-    title: "Embedded engine",
-    detail: "Filesystem and GitHub operations stay inside the native process.",
+    title: "Bundled skills CLI",
+    detail: "The app ships the pinned CLI and runs it for every change.",
   },
   {
     icon: TerminalSquare,
-    title: "Bridge connected",
-    detail: "React is talking to the Zig model through Native SDK policy checks.",
+    title: "Same behaviour",
+    detail: "Each action is one command. The console panel shows it and its output.",
   },
   {
     icon: Sparkles,
-    title: "Ready state",
-    detail: "The inventory is sourced from discovered SKILL.md manifests.",
+    title: "Read only here",
+    detail: "The list comes from skills ls --json and the CLI lock files.",
   },
 ];
 
@@ -420,31 +426,20 @@ export default function App() {
               <AgentButton
                 icon={Bot}
                 label="All agents"
-                value="all"
+                value={`${snapshot.agents.length}`}
                 active={snapshot.filters.agent === "all"}
                 onClick={() => chooseAgent("all")}
               />
-              <AgentButton
-                icon={Code2}
-                label="Codex"
-                value="codex"
-                active={snapshot.filters.agent === "codex"}
-                onClick={() => chooseAgent("codex")}
-              />
-              <AgentButton
-                icon={TerminalSquare}
-                label="Cursor"
-                value="cursor"
-                active={snapshot.filters.agent === "cursor"}
-                onClick={() => chooseAgent("cursor")}
-              />
-              <AgentButton
-                icon={Sparkles}
-                label="Claude Code"
-                value="claude-code"
-                active={snapshot.filters.agent === "claude-code"}
-                onClick={() => chooseAgent("claude-code")}
-              />
+              {snapshot.agents.map((agent) => (
+                <AgentButton
+                  key={agent}
+                  icon={Code2}
+                  label={agent}
+                  value=""
+                  active={snapshot.filters.agent === agent}
+                  onClick={() => chooseAgent(agent)}
+                />
+              ))}
             </section>
 
             <section className="sidebar-section install-section">
@@ -608,6 +603,14 @@ export default function App() {
                     <MetaRow label="AGENT" value={activeDetail.agent} />
                     <MetaRow label="PATH" value={activeDetail.path} mono />
                     <MetaRow label="SOURCE" value={activeDetail.source} mono />
+                    <MetaRow
+                      label="LOCK"
+                      value={activeDetail.managed ? "RECORDED" : "UNMANAGED"}
+                      mono
+                    />
+                    {activeDetail.hash !== "" && (
+                      <MetaRow label="HASH" value={activeDetail.hash.slice(0, 12)} mono />
+                    )}
                   </CardContent>
                 </Card>
 

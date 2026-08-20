@@ -22,16 +22,16 @@
 
 ## Phase 2: Read the inventory from the CLI
 
-- [ ] Add `electron/main/read/inventory.ts` for `skills ls --json` and `skills ls -g --json`, then merge both lists.
-- [ ] Add `electron/main/read/locks.ts` for `<project>/skills-lock.json` (version 1, `computedHash`) and `~/.agents/.skill-lock.json` (version 3, `skillFolderHash`), read-only.
-- [ ] Mark skills with no lock entry as unmanaged and keep them in the list.
-- [ ] Add `electron/main/read/manifest.ts` for the `name` and `description` front matter fields.
-- [ ] Add `electron/main/read/projects.ts` for discovery from the launch directory, its ancestors, and sibling directories.
-- [ ] Add `electron/main/snapshot.ts` producing the `Snapshot` shape declared in `frontend/src/App.tsx`.
-- [ ] Add read handlers in `ipc.ts`: `skillmanager.snapshot`, `.project`, `.search`, `.scope`, `.agent`, `.select`, `.refresh`.
-- [ ] Build the agent filter list from the `agents` array returned by `ls --json`.
-- [ ] Replace the three `activity` entries that still name the Zig engine.
-- [ ] Add unit tests for the JSON reader, both lock readers, and the unmanaged state.
+- [x] Add `electron/main/read/inventory.ts` for `skills ls --json` and `skills ls -g --json`, then merge both lists.
+- [x] Add `electron/main/read/locks.ts` for `<project>/skills-lock.json` (version 1, `computedHash`) and `~/.agents/.skill-lock.json` (version 3, `skillFolderHash`), read-only.
+- [x] Mark skills with no lock entry as unmanaged and keep them in the list.
+- [x] Add `electron/main/read/manifest.ts` for the `name` and `description` front matter fields.
+- [x] Add `electron/main/read/projects.ts` for discovery from the launch directory, its ancestors, and sibling directories.
+- [x] Add `electron/main/snapshot.ts` producing the `Snapshot` shape declared in `frontend/src/App.tsx`.
+- [x] Add read handlers in `ipc.ts`: `skillmanager.snapshot`, `.project`, `.search`, `.scope`, `.agent`, `.select`, `.refresh`.
+- [x] Build the agent filter list from the `agents` array returned by `ls --json`.
+- [x] Replace the three `activity` entries that still name the Zig engine.
+- [x] Add unit tests for the JSON reader, both lock readers, the unmanaged state, project discovery, and snapshot filtering.
 - [ ] Commit: `feat(skills): read the inventory from the bundled cli`
 
 ## Phase 3: Install, update, and remove through the CLI
