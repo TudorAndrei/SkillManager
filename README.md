@@ -1,33 +1,66 @@
 # SkillManager
 
-A Native SDK desktop app for managing agent skills across project and global installs.
+A desktop front end for the [`skills` CLI](https://github.com/vercel-labs/skills), for managing
+agent skills across project and global installs.
 
-This project uses `vercel-labs/native` with a React/Vite WebView frontend:
+**The CLI is the engine.** This repository contains no install, symlink, lock-file, or hash code.
+The app ships a pinned copy of the CLI and runs it for every change, so its behaviour is the CLI's
+behaviour. The UI shows the exact command before it runs and streams the real output.
 
-- `app.zon` declares the native app shell.
-- `frontend/src` contains the React UI and shadcn-style components.
-- `src/main.zig` wires the Native SDK runner, WebView frontend, bridge commands, and model.
-- `src/model.zig` contains model state and update messages.
+- `vendor/` pins `skills@1.5.23`, which is packaged with the app and started on Electron's own Node
+  runtime. The user needs no Node installation.
+- `electron/main` runs the CLI, reads the inventory, and owns the window.
+- `electron/preload` exposes one request function and one output stream. Nothing else.
+- `frontend/src` contains the React UI and its shadcn-style components.
 
 ## Run
 
-Install the Native SDK CLI, then run the app:
-
 ```sh
-npm install -g @native-sdk/cli
-native dev
+npm install                        # tooling
+npm ci --prefix vendor             # the pinned skills CLI
+bun install --cwd frontend         # renderer dependencies
+npm run dev                        # dev server plus Electron
 ```
 
-`native dev` starts the Vite frontend automatically and serves the production bundle from
-`frontend/dist` for packaged builds.
+`npm run build` produces the main, preload, and renderer bundles. `npm start` builds and starts the
+app from those bundles.
 
-## Commands
+## What each action runs
 
-```sh
-native check
-native test
-native dev
-```
+| UI | Command |
+| --- | --- |
+| Inventory list and refresh | `skills ls --json`, `skills ls -g --json` |
+| Install | `skills add <source> -y --skill <name> --agent <agent>` |
+| Update | `skills update <name> -y` |
+| Remove | `skills remove -y -s <name>` |
+| Skill picker | `skills add <source> -l` |
+| Find | `skills find <query> --owner <owner>` |
+| Copy prompt | `skills use <source>@<name>` |
+| Restore from lock | `skills experimental_install` |
+| Sync node_modules | `skills experimental_sync -y` |
+| New skill | `skills init <name>` |
+
+Every command carries `-y`, and `CI=1` is set, so no child process waits for input. Telemetry is
+disabled with `DO_NOT_TRACK=1` and `DISABLE_TELEMETRY=1`.
+
+`ls --json` is the only machine-readable command. Output from `find` and `add -l` is read only to
+offer choices, and it fails soft: when the format changes, the app shows the CLI's own text. What
+is installed always comes from `ls --json` and the lock files.
+
+## What the app reads directly
+
+Read-only, for metadata that `ls --json` does not return:
+
+- `<project>/skills-lock.json`, version 1, hash field `computedHash`;
+- `~/.agents/.skill-lock.json`, version 3, hash field `skillFolderHash`, plus timestamps;
+- the `name` and `description` front matter of each installed `SKILL.md`.
+
+A skill with no lock entry stays in the list and is marked unmanaged, because the agents still load
+it. Removing one asks for confirmation first.
+
+Projects are discovered from `skills-lock.json` (and the legacy `skills.lock`) in the launch
+directory, its ancestors, and the directories beside it. Without a lock file, the launch directory
+is used. Global scope resolves from `HOME`.
 
 ## Code Quality
 
@@ -59,30 +92,9 @@ mise exec -- hk check --all
 The hooks run repository hygiene checks plus gitleaks, oxlint, and oxfmt. Commit messages
 are checked against the conventional commit format.
 
-## Embedded Skill Engine
+## Upgrading the bundled CLI
 
-SkillManager keeps skill operations inside the app process. It scans `SKILL.md` files directly, copies local skill folders directly, fetches public GitHub skill files with Zig HTTP APIs, and does not route scan/install/update/remove through `npx skills`, `git`, `curl`, or another skill CLI subprocess.
-
-Supported scan roots:
-
-- Project Codex/shared skills: `.agents/skills`
-- Global Codex skills: `~/.codex/skills`
-- Claude Code skills: `.claude/skills` and `~/.claude/skills`
-- Cursor global skills: `~/.cursor/skills`
-- OpenCode global skills: `~/.config/opencode/skills`
-- Gemini CLI global skills: `~/.gemini/skills`
-
-Project scope discovers repositories from `skills-lock.json` (and legacy `skills.lock`) in the
-launch directory, its ancestors, and sibling repositories. Without a lock file, it falls back
-to the app launch directory. Global scope resolves from `HOME`.
-
-## Install Sources
-
-Local install copies a directory containing `SKILL.md` into the selected Project or Global destination and writes `.skillmanager.json`.
-
-GitHub install accepts public sources such as:
-
-- `vercel-labs/agent-skills` plus a skill path like `skills/find-docs`
-- `https://github.com/vercel-labs/agent-skills/tree/main/skills/find-docs`
-
-Update uses `.skillmanager.json` receipts. Pre-existing skills without receipts still scan and can be removed, but update requires a receipt.
+1. Change the version in `vendor/package.json` and run `npm install --prefix vendor`.
+2. Change `VENDORED_CLI_VERSION` in `electron/main/cli/paths.ts`.
+3. Run `npm test`. The smoke test checks the version, and the reader tests cover both lock schemas.
+4. Check the two fail-soft readers in `electron/main/cli/parse.ts` against the new output.

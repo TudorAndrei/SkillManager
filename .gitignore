@@ -1,6 +1,3 @@
-.build/
-.native/
-zig-out/
 out/
 dist/
 node_modules/

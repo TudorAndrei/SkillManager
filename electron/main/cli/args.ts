@@ -25,7 +25,7 @@ export interface SkillRequest {
 }
 
 /** The CLI rejects this name and answers with the list of valid agents. */
-export const AGENT_PROBE = "__skillmanager_probe__";
+const AGENT_PROBE = "__skillmanager_probe__";
 
 function scopeFlags(scope: Scope, projectFlag: string | null): string[] {
   if (scope === "global") return ["-g"];
