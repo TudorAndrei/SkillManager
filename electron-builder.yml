@@ -1,0 +1,34 @@
+appId: dev.skillmanager.desktop
+productName: SkillManager
+copyright: SkillManager
+directories:
+  output: release
+  buildResources: build
+
+# The renderer and the two process bundles. Everything else stays out.
+files:
+  - out/**
+  - frontend/dist/**
+  - package.json
+
+# The pinned skills CLI ships beside the app, outside the asar archive, and keeps
+# a real node_modules parent so Node resolves its tar and yaml dependencies.
+extraResources:
+  - from: vendor/node_modules
+    to: skills-cli/node_modules
+
+mac:
+  category: public.app-category.developer-tools
+  artifactName: SkillManager-macos-${arch}.${ext}
+  target:
+    - target: zip
+      arch:
+        - arm64
+
+linux:
+  category: Development
+  artifactName: SkillManager-linux-${arch}.${ext}
+  target:
+    - target: tar.gz
+      arch:
+        - x64

@@ -6,9 +6,11 @@ import {
   ChevronRight,
   CircleAlert,
   CircleDot,
+  ClipboardCopy,
   CloudDownload,
   Code2,
   Command,
+  Compass,
   FileCode2,
   FolderOpen,
   Globe2,
@@ -42,6 +44,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConsolePanel, type ConsoleLine } from "@/components/ConsolePanel";
+import { FindDialog, type FoundSkill } from "@/components/FindDialog";
+import { ProjectActions } from "@/components/ProjectActions";
 import { cn } from "@/lib/utils";
 
 type Skill = {
@@ -61,6 +66,7 @@ type Snapshot = {
   projects: Project[];
   projectRoot: string;
   skills: Skill[];
+  agents: string[];
   counts: { total: number; project: number; global: number; visible: number };
   filters: { search: string; scope: string; agent: string };
   active: string | null;
@@ -72,6 +78,9 @@ type Snapshot = {
     agent: string;
     path: string;
     source: string;
+    managed: boolean;
+    hash: string;
+    updatedAt: string;
   } | null;
   status: string;
   operation: { inProgress: boolean; label: string };
@@ -79,18 +88,34 @@ type Snapshot = {
 };
 
 type Scope = "all" | "project" | "global";
-type Agent = "all" | "codex" | "cursor" | "claude-code";
+/** Agent names come from `skills ls --json`, so the list follows the CLI. */
+type Agent = string;
 type Project = { path: string; name: string };
 
-type SkillCandidate = { path: string; name: string };
+/** One entry of `skills add <source> -l`. The name is what `--skill` takes. */
+type SkillCandidate = { name: string; description: string };
 type PendingInstall = { source: string; scope: Scope; agent: string };
 
 type DiscoveryResult = { candidates: SkillCandidate[] };
 
+type FindResult = { found: FoundSkill[]; output: string };
+
+type PromptResult = { prompt: string };
+
+type OutputChunk = { stream: "stdout" | "stderr"; text: string };
+
+type VersionInfo = { app: string; cli: string; cliPath: string; pinned: string };
+
+/** Every command payload is a flat set of named strings. */
+type BridgePayload = Readonly<Record<string, string>>;
+
+type BridgeResult = Snapshot | VersionInfo | DiscoveryResult | FindResult | PromptResult | null;
+
 declare global {
   interface Window {
-    zero?: {
-      invoke: (command: string, payload?: unknown) => Promise<unknown>;
+    skillmanager?: {
+      invoke: (command: string, payload?: BridgePayload) => Promise<BridgeResult>;
+      onOutput: (listener: (chunk: OutputChunk) => void) => () => void;
     };
   }
 }
@@ -99,8 +124,9 @@ const emptySnapshot: Snapshot = {
   projects: [],
   projectRoot: ".",
   skills: [],
+  agents: [],
   counts: { total: 0, project: 0, global: 0, visible: 0 },
-  filters: { search: "", scope: "all", agent: "codex" },
+  filters: { search: "", scope: "all", agent: "all" },
   active: null,
   detail: null,
   status: "Connecting to native engine...",
@@ -111,18 +137,18 @@ const emptySnapshot: Snapshot = {
 const activity = [
   {
     icon: ShieldCheck,
-    title: "Embedded engine",
-    detail: "Filesystem and GitHub operations stay inside the native process.",
+    title: "Bundled skills CLI",
+    detail: "The app ships the pinned CLI and runs it for every change.",
   },
   {
     icon: TerminalSquare,
-    title: "Bridge connected",
-    detail: "React is talking to the Zig model through Native SDK policy checks.",
+    title: "Same behaviour",
+    detail: "Each action is one command. The console panel shows it and its output.",
   },
   {
     icon: Sparkles,
-    title: "Ready state",
-    detail: "The inventory is sourced from discovered SKILL.md manifests.",
+    title: "Read only here",
+    detail: "The list comes from skills ls --json and the CLI lock files.",
   },
 ];
 
@@ -138,13 +164,16 @@ function isRemoteSource(value: string) {
 }
 
 function useNativeBridge() {
-  const request = useCallback(async function request<T = Snapshot>(
+  const request = useCallback(async function request<T extends BridgeResult = Snapshot>(
     command: string,
-    payload?: unknown,
+    payload?: BridgePayload,
   ): Promise<T> {
-    if (!window.zero?.invoke)
-      throw new Error("Native bridge unavailable. Start the app with native dev.");
-    return (await window.zero.invoke(command, payload)) as T;
+    if (!window.skillmanager?.invoke)
+      throw new Error("Bridge unavailable. Start the app with npm run dev.");
+    const result = await window.skillmanager.invoke(command, payload);
+    // SAFETY: each command name has one documented result type, and the main
+    // process rejects any command it does not answer.
+    return result as T;
   }, []);
   return request;
 }
@@ -163,6 +192,14 @@ export default function App() {
   const [pendingInstall, setPendingInstall] = useState<PendingInstall | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchSequence = useRef(0);
+  const [consoleLines, setConsoleLines] = useState<ConsoleLine[]>([]);
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [version, setVersion] = useState<VersionInfo | null>(null);
+  const consoleSequence = useRef(0);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findResults, setFindResults] = useState<FoundSkill[]>([]);
+  const [findOutput, setFindOutput] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const applySnapshot = useCallback((next: Snapshot) => {
     setSnapshot(next);
@@ -181,6 +218,26 @@ export default function App() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const unsubscribe = window.skillmanager?.onOutput((chunk) => {
+      setConsoleLines((lines) => {
+        const next = [...lines, { id: (consoleSequence.current += 1), ...chunk }];
+        return next.length > 400 ? next.slice(next.length - 400) : next;
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setVersion(await request<VersionInfo>("skillmanager.version"));
+      } catch {
+        setVersion(null);
+      }
+    })();
+  }, [request]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -208,7 +265,7 @@ export default function App() {
   }, [applySnapshot, query, request]);
 
   const run = useCallback(
-    async (command: string, payload: unknown = {}) => {
+    async (command: string, payload: BridgePayload = {}) => {
       setBusy(true);
       setBridgeError("");
       try {
@@ -256,8 +313,8 @@ export default function App() {
         source: installSource,
       });
       if (result.candidates.length === 1) {
-        setSkillPath(result.candidates[0].path);
-        await run("skillmanager.install", { ...payload, skill: result.candidates[0].path });
+        setSkillPath(result.candidates[0].name);
+        await run("skillmanager.install", { ...payload, skill: result.candidates[0].name });
       } else if (result.candidates.length > 1) {
         setCandidates(result.candidates);
         setPendingInstall({
@@ -278,6 +335,50 @@ export default function App() {
     }
   };
 
+  const findSkills = async (searchQuery: string, owner: string) => {
+    setBusy(true);
+    setBridgeError("");
+    try {
+      const result = await request<FindResult>("skillmanager.find", { query: searchQuery, owner });
+      setFindResults(result.found);
+      setFindOutput(result.output);
+    } catch (error) {
+      setBridgeError(error instanceof Error ? error.message : "Search failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // A find result is already `owner/repo@skill`, which `add` accepts as a source.
+  const installFound = (slug: string) => {
+    setFindOpen(false);
+    void run("skillmanager.install", {
+      source: slug,
+      skill: "",
+      scope: installScope,
+      agent: selectedInstallAgent,
+    });
+  };
+
+  const copyPrompt = async () => {
+    if (!snapshot.active) return;
+    setBusy(true);
+    try {
+      const result = await request<PromptResult>("skillmanager.use", { id: snapshot.active });
+      if (result.prompt.trim().length === 0) {
+        setBridgeError("This skill has no recorded source, so the CLI cannot print its prompt.");
+        return;
+      }
+      await navigator.clipboard.writeText(result.prompt);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      setBridgeError(error instanceof Error ? error.message : "Could not copy the prompt.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const closePicker = () => {
     setPickerOpen(false);
     setPendingInstall(null);
@@ -286,10 +387,10 @@ export default function App() {
 
   const installCandidate = (candidate: SkillCandidate) => {
     if (!pendingInstall) return;
-    setSkillPath(candidate.path);
+    setSkillPath(candidate.name);
     const payload = {
       source: pendingInstall.source,
-      skill: candidate.path,
+      skill: candidate.name,
       scope: pendingInstall.scope,
       agent: pendingInstall.agent,
     };
@@ -327,6 +428,15 @@ export default function App() {
             </kbd>
           </div>
           <div className="topbar-actions">
+            <Button
+              size="icon"
+              variant="ghost"
+              title="Find skills on skills.sh"
+              disabled={busy}
+              onClick={() => setFindOpen(true)}
+            >
+              <Compass size={16} />
+            </Button>
             <Button
               size="icon"
               variant="ghost"
@@ -390,31 +500,20 @@ export default function App() {
               <AgentButton
                 icon={Bot}
                 label="All agents"
-                value="all"
+                value={`${snapshot.agents.length}`}
                 active={snapshot.filters.agent === "all"}
                 onClick={() => chooseAgent("all")}
               />
-              <AgentButton
-                icon={Code2}
-                label="Codex"
-                value="codex"
-                active={snapshot.filters.agent === "codex"}
-                onClick={() => chooseAgent("codex")}
-              />
-              <AgentButton
-                icon={TerminalSquare}
-                label="Cursor"
-                value="cursor"
-                active={snapshot.filters.agent === "cursor"}
-                onClick={() => chooseAgent("cursor")}
-              />
-              <AgentButton
-                icon={Sparkles}
-                label="Claude Code"
-                value="claude-code"
-                active={snapshot.filters.agent === "claude-code"}
-                onClick={() => chooseAgent("claude-code")}
-              />
+              {snapshot.agents.map((agent) => (
+                <AgentButton
+                  key={agent}
+                  icon={Code2}
+                  label={agent}
+                  value=""
+                  active={snapshot.filters.agent === agent}
+                  onClick={() => chooseAgent(agent)}
+                />
+              ))}
             </section>
 
             <section className="sidebar-section install-section">
@@ -430,13 +529,13 @@ export default function App() {
                 disabled={busy}
               />
               <label className="field-label" htmlFor="skill-path">
-                SKILL SUBPATH <span>OPTIONAL</span>
+                SKILL NAME <span>OPTIONAL</span>
               </label>
               <Input
                 id="skill-path"
                 value={skillPath}
                 onChange={(event) => setSkillPath(event.target.value)}
-                placeholder="skills/my-skill"
+                placeholder="my-skill, or empty for every skill"
                 disabled={busy}
               />
               <div className="install-scope-toggle" role="group" aria-label="Install scope">
@@ -470,6 +569,16 @@ export default function App() {
               </Button>
             </section>
 
+            <section className="sidebar-section">
+              <SectionLabel index="05" label="PROJECT ACTIONS" />
+              <ProjectActions
+                busy={busy}
+                onRestore={() => void run("skillmanager.restore")}
+                onSync={() => void run("skillmanager.sync")}
+                onInit={(name) => void run("skillmanager.init", { name })}
+              />
+            </section>
+
             <div className="sidebar-footer">
               <div className="root-line">
                 <span>PROJECT ROOT</span>
@@ -477,7 +586,7 @@ export default function App() {
               </div>
               <div className="root-line">
                 <span>ENGINE</span>
-                <code>EMBEDDED / ZIG</code>
+                <code>{version ? `SKILLS CLI ${version.cli}` : "SKILLS CLI"}</code>
               </div>
             </div>
           </aside>
@@ -578,21 +687,37 @@ export default function App() {
                     <MetaRow label="AGENT" value={activeDetail.agent} />
                     <MetaRow label="PATH" value={activeDetail.path} mono />
                     <MetaRow label="SOURCE" value={activeDetail.source} mono />
+                    <MetaRow
+                      label="LOCK"
+                      value={activeDetail.managed ? "RECORDED" : "UNMANAGED"}
+                      mono
+                    />
+                    {activeDetail.hash !== "" && (
+                      <MetaRow label="HASH" value={activeDetail.hash.slice(0, 12)} mono />
+                    )}
                   </CardContent>
                 </Card>
 
                 <div className="detail-actions">
                   <Button
                     variant="secondary"
+                    disabled={busy || !activeDetail.managed}
+                    title="Copy the skill prompt with skills use"
+                    onClick={() => void copyPrompt()}
+                  >
+                    <ClipboardCopy size={15} /> {copied ? "COPIED" : "PROMPT"}
+                  </Button>
+                  <Button
+                    variant="secondary"
                     disabled={busy}
-                    onClick={() => void run("skillmanager.update", { id: snapshot.active })}
+                    onClick={() => void run("skillmanager.update", { id: snapshot.active ?? "" })}
                   >
                     <RefreshCw size={15} /> UPDATE
                   </Button>
                   <Button
                     variant="destructive"
                     disabled={busy}
-                    onClick={() => void run("skillmanager.remove", { id: snapshot.active })}
+                    onClick={() => void run("skillmanager.remove", { id: snapshot.active ?? "" })}
                   >
                     <Trash2 size={15} /> REMOVE
                   </Button>
@@ -626,7 +751,24 @@ export default function App() {
             </div>
           </aside>
         </div>
+        <ConsolePanel
+          lines={consoleLines}
+          open={consoleOpen}
+          busy={busy}
+          onToggle={() => setConsoleOpen((open) => !open)}
+          onClear={() => setConsoleLines([])}
+          onCancel={() => void request("skillmanager.cancel")}
+        />
       </main>
+      <FindDialog
+        open={findOpen}
+        busy={busy}
+        results={findResults}
+        output={findOutput}
+        onOpenChange={setFindOpen}
+        onSearch={(searchQuery, owner) => void findSkills(searchQuery, owner)}
+        onInstall={installFound}
+      />
       <Dialog
         open={pickerOpen}
         onOpenChange={(open) => (open ? setPickerOpen(true) : closePicker())}
@@ -643,7 +785,7 @@ export default function App() {
               <button
                 type="button"
                 className="skill-picker-option"
-                key={candidate.path}
+                key={candidate.name}
                 onClick={() => installCandidate(candidate)}
               >
                 <span className="skill-picker-icon">
@@ -651,7 +793,7 @@ export default function App() {
                 </span>
                 <span className="skill-picker-copy">
                   <strong>{candidate.name}</strong>
-                  <code>{candidate.path}</code>
+                  <code>{candidate.description}</code>
                 </span>
                 <ChevronRight size={16} className="skill-picker-arrow" />
               </button>

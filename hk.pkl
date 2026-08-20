@@ -11,10 +11,21 @@ local linters = new Mapping<String, Step> {
     ["actionlint"] = Builtins.actionlint
     ["zizmor"] = Builtins.zizmor
     ["oxfmt"] = (Builtins.oxfmt) {
-        glob = List("frontend/**/*.{ts,tsx,css,json,html}")
+        glob = List(
+            "frontend/src/**/*.{ts,tsx,css}",
+            "electron/**/*.ts",
+            "tests/**/*.ts",
+            "scripts/**/*.mjs",
+            "*.json"
+        )
     }
     ["oxlint"] = (Builtins.ox_lint) {
-        glob = List("frontend/**/*.ts", "frontend/**/*.tsx")
+        glob = List(
+            "frontend/src/**/*.{ts,tsx}",
+            "electron/**/*.ts",
+            "tests/**/*.ts",
+            "scripts/**/*.mjs"
+        )
     }
 }
 

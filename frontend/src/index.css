@@ -806,3 +806,135 @@ p {
     padding-right: 17px;
   }
 }
+
+.console-panel {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  background: rgba(9, 11, 13, 0.96);
+}
+.console-panel.open {
+  box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.35);
+}
+.console-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 32px;
+  padding: 0 14px 0 10px;
+}
+.console-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 7px;
+  color: var(--muted-foreground);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+}
+.console-toggle:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+.console-preview {
+  flex: 1;
+  overflow: hidden;
+  color: #64716f;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.console-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.console-actions button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  color: var(--muted-foreground);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+.console-actions button:hover {
+  color: var(--foreground);
+  border-color: var(--input);
+}
+.console-output {
+  height: 188px;
+  overflow-y: auto;
+  padding: 4px 14px 12px;
+  border-top: 1px solid var(--border);
+  background: #06080a;
+}
+.console-line {
+  margin: 0;
+  color: #a1b0ad;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.console-line.error {
+  color: #f1c5c1;
+}
+.console-empty {
+  color: #4d5957;
+  font-size: 11px;
+}
+
+.find-form {
+  display: grid;
+  grid-template-columns: 1fr 150px auto;
+  gap: 8px;
+  padding: 0 2px;
+}
+.find-raw {
+  margin: 0;
+  padding: 10px;
+  color: #a1b0ad;
+  background: #06080a;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+.init-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.init-row input {
+  flex: 1;
+  min-width: 0;
+}
+.init-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--muted-foreground);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.init-button:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--input);
+}
+.init-button:disabled,
+.agent-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

@@ -1,70 +1,254 @@
-# Plan: Cross-Platform Build Workflow
+# Plan: Electron Shell that Ships and Drives the Skills CLI
 
 ## Goal
 
-Add GitHub Actions that validate SkillManager on Linux and Apple Silicon macOS, then automatically create SemVer GitHub Releases from Conventional Commits on `main` and attach the two platform packages. This replaces the completed embedded-skill-library plan with a focused delivery plan for reproducible release artifacts.
+SkillManager must behave exactly like the `skills` CLI (`vercel-labs/skills`). Today it does not.
+The embedded Zig engine copies skill folders into each agent directory and writes its own
+`.skillmanager.json` receipt. The CLI keeps one copy in `.agents/skills/<name>/`, links every agent
+directory to it with a relative symlink, and records the install in a lock file. Skills that
+SkillManager installs stay invisible to `skills list` and `skills update`, and skills that the CLI
+installed can break when SkillManager removes them.
+
+This plan replaces the Zig and Native SDK shell with an Electron application that **ships the real
+CLI inside the package** and drives it for every operation. The UI becomes a faithful front end for
+the CLI. This replaces the completed cross-platform build workflow plan.
 
 ## Approach
 
-SkillManager is a Native SDK desktop app: `app.zon` describes the desktop package, `src/main.zig` supplies the Zig application entry point, and `frontend/` produces the WebView assets that are embedded from `frontend/dist`. The repository has no `.github/workflows` directory today, and `app.zon` currently limits intended package targets to macOS even though the Native SDK supports the system WebView on Linux (WebKitGTK) and macOS (WKWebView).
+### One rule
 
-The implementation will first declare Linux alongside macOS in `app.zon`, while retaining the existing system-WebView configuration. A verification workflow will run on pull requests and pushes to `main` using `ubuntu-latest` and the Apple Silicon `macos-latest` runner. It will install the native Linux WebKitGTK development dependencies on Ubuntu, provision Bun for the locked frontend dependencies, install the pinned Native SDK CLI, and run the frontend build and Native manifest/model/test checks. It will not package or retain artifacts.
+**The CLI is the engine. The application never writes skill state itself.**
 
-A release workflow will use semantic-release with Conventional Commits to decide whether a push to `main` warrants a SemVer version. When it does, semantic-release will create the Git tag and GitHub Release, then conditionally fan out to Linux and Apple Silicon macOS package jobs in that same workflow. Keeping those jobs together is required because a release created with GitHub's built-in `GITHUB_TOKEN` does not trigger a separate `release.published` workflow. The package jobs derive the manifest version from the release tag without committing it, archive the Linux install tree and macOS `.app` bundle, and upload them directly to that GitHub Release. No non-release artifacts will be retained. The workflows will not sign/notarize macOS apps, build Intel macOS or Windows variants, or publish from branches other than `main`.
+No install code, no symlink code, no lock writing, no hash computation lives in this repository.
+Every state change is a `skills` invocation. Behaviour is therefore identical by definition, not by
+imitation, and it stays identical when the CLI changes.
+
+The application reads state in only two ways, both read-only:
+
+- `skills ls --json`, the one machine-readable command;
+- the lock files and `SKILL.md` front matter, for metadata that `ls --json` does not return
+  (description, source, hash, timestamps).
+
+### Shipping the CLI
+
+`skills@1.5.23` is installed into `vendor/` with its own lockfile and copied into the package by
+electron-builder `extraResources`. It is pure JavaScript with two dependencies, `tar` and `yaml`, so
+no native rebuild is needed.
+
+It runs on Electron's own Node runtime:
+
+```text
+execFile(process.execPath, [cliPath, ...args], {
+  env: { ...env, ELECTRON_RUN_AS_NODE: '1', CI: '1', DO_NOT_TRACK: '1' },
+})
+```
+
+Electron 43.4.1 supplies Node 24.18.1 and the CLI requires Node 22.20.0 or later, so the bundled
+runtime is sufficient. The user needs no Node installation, no npx, and no separate `skills`
+install. The packaged version is pinned, so the app and the CLI never disagree about behaviour.
+
+### The UI follows the CLI
+
+Every CLI command gets a UI surface, and every UI action is one command:
+
+| CLI command | UI surface | How the result is read |
+| --- | --- | --- |
+| `add` | install panel, plus the picker for repositories with several skills | `ls --json` refresh |
+| `remove` | detail panel button | `ls --json` refresh |
+| `update` | detail panel button, and update all | `ls --json` refresh |
+| `list --json` | the inventory list | direct JSON |
+| `find` | discover view with a query field and an `--owner` filter | text output, ANSI removed |
+| `use` | copy the skill prompt from the detail panel | stdout captured |
+| `experimental_install` | restore a project from its lock file | `ls --json` refresh |
+| `experimental_sync` | sync from `node_modules` | `ls --json` refresh |
+| `init` | create a new skill | file created on disk |
+
+Three rules keep the UI honest:
+
+1. **Prompts become dialogs, then flags.** Where the CLI would ask which agents or which skills to
+   use, the UI asks the same question and passes the answer as `--agent`, `--skill`, `-g` or `-p`,
+   with `-y` so the child process never waits on input.
+2. **The command is visible.** Each action shows the exact argument list before it runs, and a
+   console panel streams the CLI's real stdout and stderr. The same line pasted into a terminal
+   gives the same result.
+3. **Text is never state.** Output from `find` and `add -l` is parsed only to offer choices. What is
+   installed always comes from `ls --json` and the lock files.
+
+The footer stops claiming an embedded Zig engine and shows the bundled CLI version instead.
+
+### Child process rules
+
+- Always an argument array, never a shell string.
+- Always `-y`, plus `CI=1` in the environment, so no command waits for input.
+- `DO_NOT_TRACK=1` and `DISABLE_TELEMETRY=1` by default; the CLI reads both.
+- `GH_TOKEN` and `GITHUB_TOKEN` pass through when present, for private repositories and rate limits.
+- A timeout kills the child, and the user can cancel a running command.
+- ANSI escapes are removed before output reaches an error message; the console panel keeps the raw
+  text.
+
+### Process architecture
+
+- **Renderer** — the current React UI, extended with the console panel and the new command views. It
+  keeps the `Snapshot` shape declared in `App.tsx`.
+- **Preload** — `contextBridge` exposes `window.skillmanager.invoke(command, payload)` and a stream
+  channel for console output. Context isolation stays on, node integration stays off.
+- **Main** — the command runner, the read-only inventory reader, and project discovery.
+
+### File layout
+
+```text
+electron/
+  main/
+    index.ts          # app lifecycle, single instance, window
+    window.ts         # window options carried over from app.zon
+    ipc.ts            # command handlers and the output stream
+    snapshot.ts       # builds the Snapshot object the renderer expects
+    cli/
+      run.ts          # locate and start the bundled CLI, stream output, cancel
+      args.ts         # one builder per command, with the flag rules
+      parse.ts        # ANSI removal, find and add -l readers
+    read/
+      inventory.ts    # skills ls --json for both scopes
+      locks.ts        # skills-lock.json v1 and .skill-lock.json v3, read-only
+      manifest.ts     # SKILL.md front matter for descriptions
+      projects.ts     # project discovery
+  preload/
+    index.ts
+frontend/             # renderer, plus the console panel and command views
+vendor/               # pinned skills CLI install with its own lockfile
+vite.main.config.ts
+vite.preload.config.ts
+scripts/dev.mjs
+electron-builder.yml
+```
+
+### Out of scope
+
+- Any re-implementation of install, symlink, lock, or hash behaviour.
+- Windows support. Targets stay macOS arm64 and Linux x64.
+- macOS signing and notarization. Releases stay unsigned, as today.
+- Auto-update, and updating the bundled CLI at runtime. The CLI version is pinned per release.
 
 ## Implementation Phases
 
-### Phase 1: Declare supported package targets
+### Phase 1: Electron shell with the bundled CLI and console
 
-- Update `app.zon` so `.platforms` contains both `"macos"` and `"linux"`, matching the requested build matrix and Native SDK package targets.
-- Validate the amended manifest with `native validate app.zon` and run `native check --strict` to make sure the platform declaration leaves the existing bridge/frontend contract intact.
-**Commit:** `chore(platform): declare linux packaging support`
+- Add `electron`, `electron-builder`, `vite`, and `vitest` to the root `package.json`, and remove
+  `@native-sdk/cli`. `electron-vite` 5 accepts Vite 5 to 7 only, while the renderer is on Vite 8, so
+  the main and preload bundles are built with plain Vite configs, and `scripts/dev.mjs` starts the
+  dev server and Electron together.
+- Add `vendor/package.json` and lockfile pinning `skills` to `1.5.23`; install with
+  `npm ci --prefix vendor --omit=dev`.
+- Add `electron/main/index.ts`, `electron/main/window.ts`, and `electron/preload/index.ts` with the
+  `app.zon` window values: 1180x760, minimum 980x620, title `SkillManager`; keep
+  `contextIsolation: true`, `nodeIntegration: false`, and denial of external navigation.
+- Add `electron/main/cli/run.ts`: path resolution for development and packaged runs, the
+  environment and timeout rules, streamed stdout and stderr, and cancel.
+- Add `electron/main/cli/parse.ts` with ANSI removal.
+- Add `vite.main.config.ts` and `vite.preload.config.ts`, both emitting CommonJS, because a preload
+  script with `sandbox: true` cannot be an ES module.
+- Set `base: "./"` in `frontend/vite.config.ts`. The renderer now loads over `file://`, where the
+  absolute asset paths of the previous build resolve against the filesystem root and leave a blank
+  window.
+- Move the renderer bridge rename here from Phase 2, because the console panel and the version
+  footer both need it.
+- Add the console panel to the renderer, showing the argument list and the streamed output.
+- Show the bundled CLI version in the footer, read from `skills --version`.
+- Add a smoke test asserting that the bundled CLI reports `1.5.23`.
+  **Commit:** `feat(shell): ship the skills cli inside an electron shell`
 
-### Phase 2: Add verification and automatic release automation
+### Phase 2: Read the inventory from the CLI
 
-- Add a semantic-release configuration that analyzes Conventional Commits on `main`, calculates the next SemVer release, and creates a GitHub Release only when a new version is warranted.
-- Add `.github/workflows/verify.yml` with pull-request and `main`-push triggers and a Linux/Apple-Silicon-macOS matrix using `ubuntu-latest` and `macos-latest`; it must not upload build artifacts.
-- Add `.github/workflows/release.yml`, triggered by pushes to `main`, with a semantic-release job and a conditional Linux/Apple-Silicon-macOS package matrix that runs only when the release job publishes a version.
-- Install Bun, restore the locked `frontend/bun.lock` dependency set with `bun install --cwd frontend --frozen-lockfile`, and build the Vite frontend with `bun run --cwd frontend build` before Native SDK compilation.
-- Add a root `package.json`/`package-lock.json` that locks `@native-sdk/cli` to `0.4.0`; install it with `npm ci --ignore-scripts`, then run its local `native` binary for validation, tests, diagnosis, builds, and packaging on each matrix host.
-- On Ubuntu, install the WebKitGTK and GTK packages required by the configured system WebView; on macOS, package unsigned (`--signing none`) because signing identities are intentionally out of scope.
-- In release-package jobs only, make the release tag's SemVer value available to the package manifest without committing generated version changes, package `zig-out/bin/skillmanager` with `frontend/dist`, archive the platform package as `SkillManager-linux-x64.tar.gz` or `SkillManager-macos-arm64.zip`, and upload it with `gh release upload`.
-- Verify the workflow YAML and release configuration are syntactically valid, the package paths match Native CLI output, verification passes from a clean checkout, and a qualifying Conventional Commit produces a release with exactly two assets.
-**Commit:** `ci(release): automate linux and macos releases`
+- Add `electron/main/read/inventory.ts` for `skills ls --json` in the selected project and
+  `skills ls -g --json` for global scope, then merge.
+- Add `electron/main/read/locks.ts` for `<project>/skills-lock.json` (version 1, `computedHash`) and
+  `~/.agents/.skill-lock.json` (version 3, `skillFolderHash`); treat both as read-only and mark
+  skills with no entry as unmanaged instead of hiding them.
+- Add `electron/main/read/manifest.ts` for the `name` and `description` front matter fields, which
+  `ls --json` does not return.
+- Add `electron/main/read/projects.ts` for project discovery from the launch directory, its
+  ancestors, and sibling directories.
+- Add `electron/main/snapshot.ts` and the read handlers in `ipc.ts`: `skillmanager.snapshot`,
+  `.project`, `.search`, `.scope`, `.agent`, `.select`, `.refresh`.
+- Build the agent filter list from the `agents` array that `ls --json` returns.
+- Replace the three `activity` entries that still name the Zig engine. The bridge itself moved to
+  Phase 1.
+- Add unit tests for the JSON reader, the lock readers, and the unmanaged state.
+  **Commit:** `feat(skills): read the inventory from the bundled cli`
 
-### Phase 3: Extend Git hook coverage for workflows
+### Phase 3: Install, update, and remove through the CLI
 
-- Extend the existing `hk.pkl` configuration instead of regenerating it, adding `actionlint` and `zizmor` because `.github/workflows/verify.yml` and `.github/workflows/release.yml` are new GitHub Actions sources.
-- Add the pinned `actionlint` tool and `zizmor` to `mise.toml`, retain the existing conventional-commit hook, and keep the existing frontend and secret-scanning checks unchanged.
-- Run `mise install`, reinstall hooks with `hk install --mise`, run `hk check --all`, and test the conventional-commit validator with a valid Conventional Commit subject. Zizmor must pass without suppressions, including its immutable-action-reference and least-privilege checks.
-**Commit:** `chore(hooks): lint github actions security`
+- Add `electron/main/cli/args.ts` with one builder per command: `add <source> -y --skill <names>
+  --agent <agents>` plus `-g` or `-p`, `remove -y -s <name>`, `update -y [name]`, each with the
+  scope flag.
+- Run `skills add -l` for repositories with more than one skill, parse the candidate list after ANSI
+  removal, and keep the existing picker dialog. If parsing fails, show the raw output and let the
+  user pass `--skill '*'`.
+- Confirm every result with an `ls --json` refresh and a lock re-read, never by reading command
+  text.
+- Wire `skillmanager.install`, `.discover`, `.update`, and `.remove`.
+- Ask for confirmation before removing a skill with no lock entry, because the old
+  `isKnownSkillPath` guard in `src/skill_store.zig` no longer applies.
+- Add unit tests for every argument builder and for the `add -l` reader.
+  **Commit:** `feat(skills): install, update, and remove through the bundled cli`
 
-### Phase 4: Repair release package jobs
+### Phase 4: Cover the remaining CLI commands
 
-- Move the lockfile-backed Native SDK CLI installation into the release package matrix before any `./node_modules/.bin/native` command; the first GitHub run showed that the install existed only in the semantic-release job, causing both package jobs to fail.
-- Upgrade the pinned `actions/checkout` and `actions/setup-node` references to their current Node 24-based releases so GitHub no longer emits Node 20 action-runtime deprecation warnings.
-- Run actionlint, zizmor, and `hk check --all`, then push the repair and watch the Linux/macOS verification and release jobs to completion.
-**Commit:** `fix(ci): install native cli in release jobs`
+- Add a discover view for `find [query] --owner <owner>`, listing `owner/repo@skill` entries with
+  their install counts, each with an install action that calls `add`.
+- Add "copy prompt" to the detail panel, calling `use <source>@<skill>` and capturing stdout.
+- Add "restore project" for `experimental_install` and "sync from node_modules" for
+  `experimental_sync`, both scoped to the selected project.
+- Add "new skill" for `init <name>`.
+- Add unit tests for the `find` output reader.
+  **Commit:** `feat(ui): cover the remaining skills cli commands`
 
-### Phase 5: Provision Native build prerequisites
+### Phase 5: Remove the Zig and Native SDK layer
 
-- Install Zig `0.16.0` on both matrix hosts from `mise.toml` with `jdx/mise-action`, pinned to the immutable commit for the Node 24-native `v4.2.0` release; the second GitHub run showed that `native doctor --strict` requires `zig` on `PATH` even though the Native SDK can provision Zig internally for tests.
-- Replace the obsolete GTK3/WebKitGTK 4.1 Ubuntu packages with GTK4 and WebKitGTK 6.0 development packages, matching the Native SDK doctor output on the current `ubuntu-latest` image.
-- Keep strict doctor validation on macOS, but use normal doctor validation on Linux because Native CLI `0.4.0` treats the expected `codesign: unsupported` platform status as a strict failure even when Zig, GTK4, WebKitGTK 6.0, and the configured system WebView are all available.
-- Run actionlint, zizmor, and `hk check --all`, then push and verify both matrices and the two release archives from GitHub-hosted runners.
-**Commit:** `fix(ci): install native build prerequisites`
+- Delete `src/main.zig`, `src/model.zig`, `src/skill_store.zig`, `src/skill_paths.zig`,
+  `src/skill_manifest.zig`, `src/github_source.zig`, `src/tests.zig`, `app.zon`, and `.native/`.
+- Remove `zig` from `mise.toml` and update `.gitignore` for the Electron output directories.
+- Extend the `oxfmt` and `oxlint` globs in `hk.pkl` to cover `electron/**`.
+- Rewrite `README.md`: the Run and Commands sections, and replace "Embedded Skill Engine" with a
+  statement that the app ships and drives the pinned `skills` CLI, including the version.
+  **Commit:** `refactor(app): remove the zig native sdk layer`
+
+### Phase 6: Package and release Electron artifacts
+
+- Add `electron-builder.yml` with `appId: dev.skillmanager.desktop`, macOS `zip` arm64, Linux
+  `tar.gz` x64, and `extraResources` copying `vendor/node_modules` to `skills-cli`.
+- Update `.github/workflows/verify.yml`: remove Zig, the Native SDK CLI, and the GTK and WebKitGTK
+  packages; add type check, lint, unit tests, and an unpacked build that runs the bundled CLI once.
+- Update `.github/workflows/release.yml`: keep semantic-release, the two-platform matrix, and the
+  asset names `SkillManager-linux-x64.tar.gz` and `SkillManager-macos-arm64.zip`; set the version
+  from the release tag in `package.json`.
+- Verify with `actionlint`, `zizmor`, and `hk check --all`.
+  **Commit:** `ci(release): package electron artifacts for linux and macos`
 
 ## Risks & Tradeoffs
 
-- `ubuntu-latest` can change its available WebKitGTK package names or versions. Mitigation: install the explicit development packages required by the Native SDK system-WebView build and let `native doctor --strict` fail early with a useful log.
-- `macos-latest` must continue to resolve to an Apple Silicon runner for the selected macOS package. Mitigation: name the asset explicitly as `macos-arm64` and fail the workflow if the runner architecture is not ARM64; Intel output is intentionally out of scope.
-- The system WebView keeps package size low but Linux rendering depends on the user's installed WebKitGTK runtime. Mitigation: use the Native SDK's system-engine packaging and document this distribution constraint rather than silently bundling Chromium/CEF.
-- Unsigned macOS release assets may trigger Gatekeeper warnings. Mitigation: publish unsigned releases for now; add signing/notarization only when Developer ID credentials are available.
-- Frontend dependencies are locked with Bun, while the Native CLI is installed globally with npm. Mitigation: pin the CLI version in the workflow and keep the two dependency-install steps separate and explicit.
-- The existing hk configuration imports its pinned package over HTTPS. Mitigation: keep its already-pinned `v1.50.0` import and run hooks with normal developer/CI network access; do not regenerate unrelated hook settings.
+- **Only `list` is machine-readable.** Mitigation: state always comes from `ls --json` and the lock
+  files; command text is used only to offer choices, and the raw output stays visible in the console
+  panel.
+- **`find` and `add -l` output can change format.** Mitigation: the parsers fail soft. A parse
+  failure shows the raw output and a manual entry field instead of an error.
+- **Interactive prompts can block a child process.** Mitigation: `-y` on every call, explicit
+  `--skill` and `--agent`, `CI=1`, a timeout, and a cancel action.
+- **Process start cost.** Each action starts a Node process, about 100 to 300 ms. Acceptable,
+  because installs are network-bound and the inventory refresh is one call.
+- **Pinned CLI version.** Users do not get CLI fixes until the app releases. Mitigation: the version
+  is visible in the footer, and a CLI bump is a normal dependency commit.
+- **Destructive removes.** The app can now remove what the CLI installed, which is the point.
+  Mitigation: confirm before removing a skill with no lock entry.
+- **Package size.** About 150 MB against 2 MB today, which is the cost of the bundled runtime.
+- **Unsigned macOS artifacts.** Gatekeeper warnings continue, as today.
 
-## Confirmed Decisions
+## Open Questions
 
-- Semantic-release will create GitHub Releases from SemVer versions determined by Conventional Commits.
-- macOS release packages target Apple Silicon (`arm64`) only.
-- Verification builds do not upload or retain artifacts; only published releases carry downloadable packages.
+- Should the console panel be always visible, or open on demand from a status line?
+- Should `find` results use the CLI, or the `skills.sh` API that the CLI itself uses through
+  `SKILLS_API_URL`? The plan uses the CLI, to keep one behaviour source.
+- Should the app expose `--copy` (copy instead of symlink) as an install option? The plan uses the
+  CLI default, which is symlink.
+- Should a CLI version bump be a release-blocking test, so that a new CLI cannot ship without the
+  parsers being checked?
