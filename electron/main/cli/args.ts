@@ -52,6 +52,33 @@ export function repoSkillsArgs(source: string): string[] {
   return ["add", source, "-l"];
 }
 
+/** Search skills.sh. An empty query would open the interactive browser. */
+export function findArgs(query: string, owner: string): string[] {
+  const args = ["find", query];
+  return owner === "" ? args : [...args, "--owner", owner];
+}
+
+/** Print the prompt of one skill without installing it. */
+export function useArgs(source: string, skill: string): string[] {
+  return ["use", `${source}@${skill}`];
+}
+
+/** Restore a project from its lock file. */
+export function restoreArgs(): string[] {
+  return ["experimental_install"];
+}
+
+/** Link skills that live in `node_modules` into the agent directories. */
+export function syncArgs(agents: string[]): string[] {
+  const args = ["experimental_sync", "-y"];
+  return agents.length === 0 ? args : [...args, "--agent", ...agents];
+}
+
+/** Create a new skill in the project. */
+export function initArgs(name: string): string[] {
+  return ["init", name];
+}
+
 export function validAgentsArgs(): string[] {
   return ["ls", "-a", AGENT_PROBE];
 }

@@ -6,9 +6,11 @@ import {
   ChevronRight,
   CircleAlert,
   CircleDot,
+  ClipboardCopy,
   CloudDownload,
   Code2,
   Command,
+  Compass,
   FileCode2,
   FolderOpen,
   Globe2,
@@ -43,6 +45,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConsolePanel, type ConsoleLine } from "@/components/ConsolePanel";
+import { FindDialog, type FoundSkill } from "@/components/FindDialog";
+import { ProjectActions } from "@/components/ProjectActions";
 import { cn } from "@/lib/utils";
 
 type Skill = {
@@ -94,6 +98,10 @@ type PendingInstall = { source: string; scope: Scope; agent: string };
 
 type DiscoveryResult = { candidates: SkillCandidate[] };
 
+type FindResult = { found: FoundSkill[]; output: string };
+
+type PromptResult = { prompt: string };
+
 type OutputChunk = { stream: "stdout" | "stderr"; text: string };
 
 type VersionInfo = { app: string; cli: string; cliPath: string; pinned: string };
@@ -101,7 +109,7 @@ type VersionInfo = { app: string; cli: string; cliPath: string; pinned: string }
 /** Every command payload is a flat set of named strings. */
 type BridgePayload = Readonly<Record<string, string>>;
 
-type BridgeResult = Snapshot | VersionInfo | DiscoveryResult | null;
+type BridgeResult = Snapshot | VersionInfo | DiscoveryResult | FindResult | PromptResult | null;
 
 declare global {
   interface Window {
@@ -188,6 +196,10 @@ export default function App() {
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [version, setVersion] = useState<VersionInfo | null>(null);
   const consoleSequence = useRef(0);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findResults, setFindResults] = useState<FoundSkill[]>([]);
+  const [findOutput, setFindOutput] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const applySnapshot = useCallback((next: Snapshot) => {
     setSnapshot(next);
@@ -323,6 +335,50 @@ export default function App() {
     }
   };
 
+  const findSkills = async (searchQuery: string, owner: string) => {
+    setBusy(true);
+    setBridgeError("");
+    try {
+      const result = await request<FindResult>("skillmanager.find", { query: searchQuery, owner });
+      setFindResults(result.found);
+      setFindOutput(result.output);
+    } catch (error) {
+      setBridgeError(error instanceof Error ? error.message : "Search failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // A find result is already `owner/repo@skill`, which `add` accepts as a source.
+  const installFound = (slug: string) => {
+    setFindOpen(false);
+    void run("skillmanager.install", {
+      source: slug,
+      skill: "",
+      scope: installScope,
+      agent: selectedInstallAgent,
+    });
+  };
+
+  const copyPrompt = async () => {
+    if (!snapshot.active) return;
+    setBusy(true);
+    try {
+      const result = await request<PromptResult>("skillmanager.use", { id: snapshot.active });
+      if (result.prompt.trim().length === 0) {
+        setBridgeError("This skill has no recorded source, so the CLI cannot print its prompt.");
+        return;
+      }
+      await navigator.clipboard.writeText(result.prompt);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      setBridgeError(error instanceof Error ? error.message : "Could not copy the prompt.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const closePicker = () => {
     setPickerOpen(false);
     setPendingInstall(null);
@@ -372,6 +428,15 @@ export default function App() {
             </kbd>
           </div>
           <div className="topbar-actions">
+            <Button
+              size="icon"
+              variant="ghost"
+              title="Find skills on skills.sh"
+              disabled={busy}
+              onClick={() => setFindOpen(true)}
+            >
+              <Compass size={16} />
+            </Button>
             <Button
               size="icon"
               variant="ghost"
@@ -504,6 +569,16 @@ export default function App() {
               </Button>
             </section>
 
+            <section className="sidebar-section">
+              <SectionLabel index="05" label="PROJECT ACTIONS" />
+              <ProjectActions
+                busy={busy}
+                onRestore={() => void run("skillmanager.restore")}
+                onSync={() => void run("skillmanager.sync")}
+                onInit={(name) => void run("skillmanager.init", { name })}
+              />
+            </section>
+
             <div className="sidebar-footer">
               <div className="root-line">
                 <span>PROJECT ROOT</span>
@@ -626,6 +701,14 @@ export default function App() {
                 <div className="detail-actions">
                   <Button
                     variant="secondary"
+                    disabled={busy || !activeDetail.managed}
+                    title="Copy the skill prompt with skills use"
+                    onClick={() => void copyPrompt()}
+                  >
+                    <ClipboardCopy size={15} /> {copied ? "COPIED" : "PROMPT"}
+                  </Button>
+                  <Button
+                    variant="secondary"
                     disabled={busy}
                     onClick={() => void run("skillmanager.update", { id: snapshot.active ?? "" })}
                   >
@@ -677,6 +760,15 @@ export default function App() {
           onCancel={() => void request("skillmanager.cancel")}
         />
       </main>
+      <FindDialog
+        open={findOpen}
+        busy={busy}
+        results={findResults}
+        output={findOutput}
+        onOpenChange={setFindOpen}
+        onSearch={(searchQuery, owner) => void findSkills(searchQuery, owner)}
+        onInstall={installFound}
+      />
       <Dialog
         open={pickerOpen}
         onOpenChange={(open) => (open ? setPickerOpen(true) : closePicker())}

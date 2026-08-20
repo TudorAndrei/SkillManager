@@ -49,13 +49,15 @@
 
 ## Phase 4: Cover the remaining CLI commands
 
-- [ ] Add the discover view for `find [query] --owner <owner>`, listing `owner/repo@skill` with install counts.
-- [ ] Add an install action on each find result that calls `add`.
-- [ ] Add "copy prompt" in the detail panel, calling `use <source>@<skill>` and capturing stdout.
-- [ ] Add "restore project" for `experimental_install`, scoped to the selected project.
-- [ ] Add "sync from node_modules" for `experimental_sync`.
-- [ ] Add "new skill" for `init <name>`.
-- [ ] Add unit tests for the `find` output reader.
+- [x] Add the discover view for `find [query] --owner <owner>`, listing `owner/repo@skill` with install counts.
+- [x] Add an install action on each find result that calls `add`.
+- [x] Show the raw CLI text when no find result parses, instead of an empty list.
+- [x] Add "copy prompt" in the detail panel, calling `use <source>@<skill>` and capturing stdout.
+- [x] Add "restore project" for `experimental_install`, scoped to the selected project.
+- [x] Add "sync from node_modules" for `experimental_sync`.
+- [x] Add "new skill" for `init <name>`.
+- [x] Add unit tests for the `find` output reader and the new argument builders.
+- [x] Exercise find, init, restore, and use through the real bridge.
 - [ ] Commit: `feat(ui): cover the remaining skills cli commands`
 
 ## Phase 5: Remove the Zig and Native SDK layer

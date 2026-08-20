@@ -72,6 +72,36 @@ export function parseRepoSkills(text: string): RepoSkill[] {
   return skills;
 }
 
+export interface FoundSkill {
+  /** `owner/repo@skill`, which is what `add` and `use` accept. */
+  slug: string;
+  installs: string;
+  url: string;
+}
+
+const FIND_ROW = /^(\S+\/\S+@\S+)\s+(.*)$/;
+
+/**
+ * Read the results of `skills find`. Human text again, so it only offers
+ * choices: installing one of them runs `add` and the list is then read back
+ * from `ls --json`.
+ */
+export function parseFindResults(text: string): FoundSkill[] {
+  const found: FoundSkill[] = [];
+  for (const raw of cleanOutput(text).split("\n")) {
+    const line = raw.trim();
+    const row = FIND_ROW.exec(line);
+    if (row !== null) {
+      found.push({ slug: row[1], installs: row[2].trim(), url: "" });
+      continue;
+    }
+    const current = found[found.length - 1];
+    if (current === undefined || !line.startsWith("└")) continue;
+    current.url = line.slice(1).trim();
+  }
+  return found;
+}
+
 /** The valid agent identifiers, which the CLI prints when one is rejected. */
 export function parseValidAgents(text: string): string[] {
   const line = cleanOutput(text)

@@ -4,13 +4,24 @@ import { app, dialog, ipcMain, type BrowserWindow } from "electron";
 import {
   addArgs,
   agentIdentifier,
+  findArgs,
+  initArgs,
   removeArgs,
   repoSkillsArgs,
+  restoreArgs,
+  syncArgs,
   updateArgs,
+  useArgs,
   validAgentsArgs,
   type Scope,
 } from "./cli/args.ts";
-import { parseRepoSkills, parseValidAgents, type RepoSkill } from "./cli/parse.ts";
+import {
+  parseFindResults,
+  parseRepoSkills,
+  parseValidAgents,
+  type FoundSkill,
+  type RepoSkill,
+} from "./cli/parse.ts";
 import { resolveCliPath, VENDORED_CLI_VERSION } from "./cli/paths.ts";
 import { failureMessage, runCli, succeeded, type OutputChunk, type RunResult } from "./cli/run.ts";
 import { asObject, asText, type JsonValue } from "./read/json.ts";
@@ -22,6 +33,18 @@ import { INVOKE_CHANNEL, OUTPUT_CHANNEL, type BridgeResult } from "../shared/con
 interface DiscoveryResult {
   candidates: RepoSkill[];
 }
+
+interface FindResult {
+  found: FoundSkill[];
+  /** Kept so the view can show the CLI's own words when nothing parses. */
+  output: string;
+}
+
+interface PromptResult {
+  prompt: string;
+}
+
+type CommandResult = BridgeResult | DiscoveryResult | FindResult | PromptResult;
 
 interface UiState {
   projects: ProjectRow[];
@@ -216,7 +239,7 @@ async function dispatch(
   window: BrowserWindow | null,
   command: string,
   payload: JsonValue,
-): Promise<BridgeResult | DiscoveryResult> {
+): Promise<CommandResult> {
   switch (command) {
     case "skillmanager.version":
       return {
@@ -255,6 +278,30 @@ async function dispatch(
     case "skillmanager.discover": {
       const result = await run(window, repoSkillsArgs(stringField(payload, "source")));
       return { candidates: parseRepoSkills(result.stdout + result.stderr) };
+    }
+    case "skillmanager.find": {
+      const query = stringField(payload, "query");
+      const result = await run(window, findArgs(query, stringField(payload, "owner")));
+      const output = result.stdout + result.stderr;
+      return { found: parseFindResults(output), output };
+    }
+    case "skillmanager.use": {
+      const skill = findSkill(stringField(payload, "id"));
+      if (skill === undefined || skill.lock?.source === undefined || skill.lock.source === null) {
+        // `use` needs the source repository, which only a lock entry carries.
+        return { prompt: "" };
+      }
+      const result = await run(window, useArgs(skill.lock.source, skill.cli.name));
+      return { prompt: succeeded(result) ? result.stdout : "" };
+    }
+    case "skillmanager.restore":
+      return runWrite(window, restoreArgs(), state.projectRoot, "Restore failed.");
+    case "skillmanager.sync":
+      return runWrite(window, syncArgs([]), state.projectRoot, "Sync failed.");
+    case "skillmanager.init": {
+      const name = stringField(payload, "name");
+      if (name === "") return snapshot();
+      return runWrite(window, initArgs(name), state.projectRoot, "Could not create the skill.");
     }
     case "skillmanager.install": {
       const scope = scopeField(payload);

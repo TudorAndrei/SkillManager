@@ -2,13 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   addArgs,
   agentIdentifier,
+  findArgs,
+  initArgs,
   removeArgs,
   repoSkillsArgs,
+  restoreArgs,
+  syncArgs,
   updateArgs,
+  useArgs,
   validAgentsArgs,
 } from "../electron/main/cli/args.ts";
 import {
   formatCommandLine,
+  parseFindResults,
   parseRepoSkills,
   parseValidAgents,
 } from "../electron/main/cli/parse.ts";
@@ -65,6 +71,19 @@ describe("argument builders", () => {
     expect(repoSkillsArgs("owner/repo")).not.toContain("-y");
   });
 
+  it("builds the project-wide commands", () => {
+    expect(findArgs("react", "")).toEqual(["find", "react"]);
+    expect(findArgs("react", "vercel")).toEqual(["find", "react", "--owner", "vercel"]);
+    expect(useArgs("vercel-labs/agent-skills", "deploy-to-vercel")).toEqual([
+      "use",
+      "vercel-labs/agent-skills@deploy-to-vercel",
+    ]);
+    expect(restoreArgs()).toEqual(["experimental_install"]);
+    expect(syncArgs([])).toEqual(["experimental_sync", "-y"]);
+    expect(syncArgs(["codex"])).toEqual(["experimental_sync", "-y", "--agent", "codex"]);
+    expect(initArgs("my-skill")).toEqual(["init", "my-skill"]);
+  });
+
   it("quotes a wildcard when the command line is shown to the user", () => {
     const line = formatCommandLine(
       addArgs({ source: "o/r", skills: ["*"], agents: [], scope: "project" }),
@@ -111,6 +130,34 @@ describe("fail-soft text readers", () => {
 
   it("returns nothing when the format changed, instead of guessing", () => {
     expect(parseRepoSkills("Something completely different\n")).toEqual([]);
+  });
+
+  it("reads the results of find, with the install count and the page", () => {
+    const output = [
+      "Install with npx skills add <owner/repo@skill>",
+      "",
+      "vercel/turborepo@turborepo 63.6K installs",
+      "└ https://skills.sh/vercel/turborepo/turborepo",
+      "",
+      "vercel/ai@ai-sdk 48.9K installs",
+      "└ https://skills.sh/vercel/ai/ai-sdk",
+    ].join("\n");
+    expect(parseFindResults(output)).toEqual([
+      {
+        slug: "vercel/turborepo@turborepo",
+        installs: "63.6K installs",
+        url: "https://skills.sh/vercel/turborepo/turborepo",
+      },
+      {
+        slug: "vercel/ai@ai-sdk",
+        installs: "48.9K installs",
+        url: "https://skills.sh/vercel/ai/ai-sdk",
+      },
+    ]);
+  });
+
+  it("returns no results rather than guessing when find output changes", () => {
+    expect(parseFindResults("No skills matched your search.")).toEqual([]);
   });
 
   it("reads the valid agent identifiers the CLI reports", () => {

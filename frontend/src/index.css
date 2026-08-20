@@ -892,3 +892,49 @@ p {
   color: #4d5957;
   font-size: 11px;
 }
+
+.find-form {
+  display: grid;
+  grid-template-columns: 1fr 150px auto;
+  gap: 8px;
+  padding: 0 2px;
+}
+.find-raw {
+  margin: 0;
+  padding: 10px;
+  color: #a1b0ad;
+  background: #06080a;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+.init-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.init-row input {
+  flex: 1;
+  min-width: 0;
+}
+.init-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--muted-foreground);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.init-button:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--input);
+}
+.init-button:disabled,
+.agent-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
