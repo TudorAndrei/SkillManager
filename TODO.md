@@ -71,11 +71,13 @@
 
 ## Phase 6: Package and release Electron artifacts
 
-- [ ] Add `electron-builder.yml` with `appId: dev.skillmanager.desktop`, macOS `zip` arm64, Linux `tar.gz` x64, and `extraResources` from `vendor/node_modules` to `skills-cli`.
-- [ ] Update `.github/workflows/verify.yml`: drop Zig, the Native SDK CLI, and the GTK and WebKitGTK packages; add type check, lint, unit tests, and an unpacked build that runs the bundled CLI once.
-- [ ] Update `.github/workflows/release.yml`: keep semantic-release and the two-platform matrix; set the version from the release tag in `package.json`.
-- [ ] Keep the asset names `SkillManager-linux-x64.tar.gz` and `SkillManager-macos-arm64.zip`.
-- [ ] Run `actionlint`, `zizmor`, and `hk check --all`.
+- [x] Add `electron-builder.yml` with `appId: dev.skillmanager.desktop`, macOS `zip` arm64, Linux `tar.gz` x64, and `extraResources` from `vendor/node_modules` to `skills-cli/node_modules`.
+- [x] Update `.github/workflows/verify.yml`: drop Zig, the Native SDK CLI, and the GTK and WebKitGTK packages; add type check, lint, knip, unit tests, and a build.
+- [x] Download the Electron binary explicitly, because an npm install-script policy can skip its postinstall.
+- [x] Update `.github/workflows/release.yml`: keep semantic-release and the two-platform matrix; set the version from the release tag with `npm version --no-git-tag-version`.
+- [x] Check that each packaged artifact contains the bundled CLI before it is uploaded.
+- [x] Keep the asset names `SkillManager-linux-x64.tar.gz` and `SkillManager-macos-arm64.zip`.
+- [x] Run `actionlint`, `zizmor`, and `hk check --all`.
 - [ ] Commit: `ci(release): package electron artifacts for linux and macos`
 
 ## Verification

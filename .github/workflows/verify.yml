@@ -32,40 +32,36 @@ jobs:
         with:
           node-version: 24
 
-      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
-        with:
-          install_args: zig
-
-      - name: Install locked Native SDK CLI
-        run: npm ci --ignore-scripts
-
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
 
-      - name: Install Linux system WebView prerequisites
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libgtk-4-dev libwebkitgtk-6.0-dev
-
       - name: Verify runner architecture
         run: test "$RUNNER_ARCH" = "${{ matrix.architecture }}"
 
-      - name: Install frontend dependencies
+      - name: Install tooling
+        run: npm ci
+
+      - name: Ensure the Electron binary is present
+        run: node node_modules/electron/install.js
+
+      - name: Install the pinned skills CLI
+        run: npm ci --prefix vendor
+
+      - name: Install renderer dependencies
         run: bun install --cwd frontend --frozen-lockfile
 
-      - name: Build frontend
-        run: bun run --cwd frontend build
+      - name: Type check
+        run: npm run typecheck
 
-      - name: Validate, test, and build
-        run: |
-          ./node_modules/.bin/native validate app.zon
-          ./node_modules/.bin/native check --strict
-          ./node_modules/.bin/native test --yes
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            ./node_modules/.bin/native doctor --manifest app.zon --strict
-          else
-            ./node_modules/.bin/native doctor --manifest app.zon
-          fi
-          ./node_modules/.bin/native build --yes
+      - name: Lint
+        run: npm run lint
+
+      - name: Check for unused files, exports, and dependencies
+        run: npm run knip
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
