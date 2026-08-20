@@ -16,7 +16,7 @@ export function stripAnsi(text: string): string {
  * Collapse spinner frames. The CLI redraws one line with carriage returns, which
  * would otherwise fill the console panel with hundreds of duplicate lines.
  */
-export function collapseProgress(text: string): string {
+function collapseProgress(text: string): string {
   return text
     .split("\n")
     .map((line) => {

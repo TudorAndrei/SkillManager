@@ -6,7 +6,7 @@ import type { ProjectRow } from "./read/projects.ts";
  * `frontend/src/App.tsx` already declares, so the view code did not change when
  * the engine changed.
  */
-export interface SkillRow {
+interface SkillRow {
   id: string;
   name: string;
   description: string;
@@ -19,7 +19,7 @@ export interface SkillRow {
   active: boolean;
 }
 
-export interface SkillDetail {
+interface SkillDetail {
   name: string;
   description: string;
   scope: string;
@@ -60,7 +60,7 @@ export interface SnapshotInput {
 
 export const UNMANAGED_SOURCE = "unmanaged";
 
-export function skillId(skill: EnrichedSkill): string {
+function skillId(skill: EnrichedSkill): string {
   return `${skill.cli.scope}:${skill.cli.name}`;
 }
 
@@ -107,7 +107,7 @@ function matchesAgent(skill: EnrichedSkill, agent: string): boolean {
 }
 
 /** Every agent name the CLI reported, sorted, for the sidebar filter. */
-export function agentNames(skills: EnrichedSkill[]): string[] {
+function agentNames(skills: EnrichedSkill[]): string[] {
   const names = new Set<string>();
   for (const skill of skills) for (const agent of skill.cli.agents) names.add(agent);
   return [...names].sort((a, b) => a.localeCompare(b));

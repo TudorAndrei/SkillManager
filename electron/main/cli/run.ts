@@ -40,7 +40,7 @@ const KILL_GRACE_MS = 2_000;
  * argument list keep the child from waiting for input. Telemetry is disabled by
  * default; the CLI reads both variable names.
  */
-export function cliEnvironment(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+function cliEnvironment(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return {
     ...base,
     ELECTRON_RUN_AS_NODE: "1",

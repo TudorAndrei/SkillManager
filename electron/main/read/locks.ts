@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { asNumber, asObject, asText, entriesOf, parseJson, type JsonValue } from "./json.ts";
 
 /**
  * Lock files are read-only here. The CLI writes them; this application only
@@ -11,9 +12,9 @@ import { join } from "node:path";
  *   plus `installedAt`, `updatedAt`, and an optional `pluginName`.
  */
 export const PROJECT_LOCK_FILE = "skills-lock.json";
-export const GLOBAL_LOCK_FILE = join(".agents", ".skill-lock.json");
-export const SUPPORTED_PROJECT_LOCK_VERSION = 1;
-export const SUPPORTED_GLOBAL_LOCK_VERSION = 3;
+const GLOBAL_LOCK_FILE = join(".agents", ".skill-lock.json");
+const SUPPORTED_PROJECT_LOCK_VERSION = 1;
+const SUPPORTED_GLOBAL_LOCK_VERSION = 3;
 
 export interface LockEntry {
   name: string;
@@ -34,22 +35,20 @@ export interface LockFile {
   entries: Map<string, LockEntry>;
 }
 
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function toEntry(name: string, value: unknown): LockEntry | null {
-  if (typeof value !== "object" || value === null) return null;
-  const record = value as Record<string, unknown>;
+function toEntry(name: string, value: JsonValue): LockEntry | null {
+  const record = asObject(value);
+  if (record === null) return null;
   return {
     name,
-    source: asString(record.source),
-    sourceType: asString(record.sourceType),
-    sourceUrl: asString(record.sourceUrl),
-    skillPath: asString(record.skillPath),
-    hash: asString(record.computedHash) ?? asString(record.skillFolderHash),
-    installedAt: asString(record.installedAt),
-    updatedAt: asString(record.updatedAt),
+    source: asText(record.source),
+    sourceType: asText(record.sourceType),
+    sourceUrl: asText(record.sourceUrl),
+    skillPath: asText(record.skillPath),
+    // The project schema names the hash `computedHash`, the global one
+    // `skillFolderHash`. Both hold the same folder digest.
+    hash: asText(record.computedHash) ?? asText(record.skillFolderHash),
+    installedAt: asText(record.installedAt),
+    updatedAt: asText(record.updatedAt),
   };
 }
 
@@ -66,23 +65,14 @@ async function readLock(path: string, supportedVersion: number): Promise<LockFil
     return emptyLock(path);
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return emptyLock(path);
-  }
-  if (typeof parsed !== "object" || parsed === null) return emptyLock(path);
+  const record = asObject(parseJson(raw));
+  if (record === null) return emptyLock(path);
 
-  const record = parsed as Record<string, unknown>;
-  const version = typeof record.version === "number" ? record.version : null;
+  const version = asNumber(record.version);
   const entries = new Map<string, LockEntry>();
-  const skills = record.skills;
-  if (typeof skills === "object" && skills !== null) {
-    for (const [name, value] of Object.entries(skills)) {
-      const entry = toEntry(name, value);
-      if (entry) entries.set(name, entry);
-    }
+  for (const [name, value] of entriesOf(record.skills)) {
+    const entry = toEntry(name, value);
+    if (entry !== null) entries.set(name, entry);
   }
 
   return {

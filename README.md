@@ -29,6 +29,24 @@ native test
 native dev
 ```
 
+## Code Quality
+
+```sh
+npm run lint       # oxlint with the anti-slop rules
+npm run knip       # unused files, exports, and dependencies
+npm run typecheck  # main and preload types
+npm test           # unit tests
+```
+
+`tools/oxlint/anti-slop/` holds the Oxlint plugin from
+[dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop), installed by its own
+`install-anti-slop` skill and configured in `.oxlintrc.json`. All 15 generic rules run at
+`error`. `electron/main/read/json.ts` is the single JSON parse boundary, and it is the only
+file that inspects unparsed values.
+
+[knip](https://github.com/webpro-nl/knip) checks the root and `frontend` workspaces for unused
+files, exports, and dependencies.
+
 ## Git Hooks
 
 Install the mise-managed tools and hk hooks with:

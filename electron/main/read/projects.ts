@@ -19,7 +19,7 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-export async function hasProjectLock(directory: string): Promise<boolean> {
+async function hasProjectLock(directory: string): Promise<boolean> {
   return (
     (await exists(join(directory, PROJECT_LOCK_FILE))) ||
     (await exists(join(directory, LEGACY_LOCK_FILE)))

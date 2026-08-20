@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["electron/main/index.ts", "electron/preload/index.ts", "tests/**/*.test.ts"],
+      "project": ["electron/**/*.ts", "scripts/**/*.mjs", "tests/**/*.ts"]
+    },
+    "frontend": {
+      "project": ["src/**/*.{ts,tsx}"]
+    }
+  },
+  "ignoreBinaries": ["native"]
+}

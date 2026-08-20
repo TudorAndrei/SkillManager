@@ -97,10 +97,15 @@ type OutputChunk = { stream: "stdout" | "stderr"; text: string };
 
 type VersionInfo = { app: string; cli: string; cliPath: string; pinned: string };
 
+/** Every command payload is a flat set of named strings. */
+type BridgePayload = Readonly<Record<string, string>>;
+
+type BridgeResult = Snapshot | VersionInfo | DiscoveryResult | null;
+
 declare global {
   interface Window {
     skillmanager?: {
-      invoke: (command: string, payload?: unknown) => Promise<unknown>;
+      invoke: (command: string, payload?: BridgePayload) => Promise<BridgeResult>;
       onOutput: (listener: (chunk: OutputChunk) => void) => () => void;
     };
   }
@@ -150,13 +155,16 @@ function isRemoteSource(value: string) {
 }
 
 function useNativeBridge() {
-  const request = useCallback(async function request<T = Snapshot>(
+  const request = useCallback(async function request<T extends BridgeResult = Snapshot>(
     command: string,
-    payload?: unknown,
+    payload?: BridgePayload,
   ): Promise<T> {
     if (!window.skillmanager?.invoke)
       throw new Error("Bridge unavailable. Start the app with npm run dev.");
-    return (await window.skillmanager.invoke(command, payload)) as T;
+    const result = await window.skillmanager.invoke(command, payload);
+    // SAFETY: each command name has one documented result type, and the main
+    // process rejects any command it does not answer.
+    return result as T;
   }, []);
   return request;
 }
@@ -244,7 +252,7 @@ export default function App() {
   }, [applySnapshot, query, request]);
 
   const run = useCallback(
-    async (command: string, payload: unknown = {}) => {
+    async (command: string, payload: BridgePayload = {}) => {
       setBusy(true);
       setBridgeError("");
       try {
@@ -618,14 +626,14 @@ export default function App() {
                   <Button
                     variant="secondary"
                     disabled={busy}
-                    onClick={() => void run("skillmanager.update", { id: snapshot.active })}
+                    onClick={() => void run("skillmanager.update", { id: snapshot.active ?? "" })}
                   >
                     <RefreshCw size={15} /> UPDATE
                   </Button>
                   <Button
                     variant="destructive"
                     disabled={busy}
-                    onClick={() => void run("skillmanager.remove", { id: snapshot.active })}
+                    onClick={() => void run("skillmanager.remove", { id: snapshot.active ?? "" })}
                   >
                     <Trash2 size={15} /> REMOVE
                   </Button>

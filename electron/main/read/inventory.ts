@@ -1,4 +1,5 @@
 import type { RunResult } from "../cli/run.ts";
+import { asObject, asText, asTextList, parseJson } from "./json.ts";
 
 /** One entry of `skills ls --json`. */
 export interface CliSkill {
@@ -13,10 +14,6 @@ export interface CliSkill {
 
 export type Runner = (args: string[], cwd?: string) => Promise<RunResult>;
 
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
 /**
  * `ls --json` is the only machine-readable command, so this is the one place
  * where CLI output becomes state. Anything unexpected is dropped rather than
@@ -26,31 +23,25 @@ export function parseListJson(text: string): CliSkill[] {
   const trimmed = text.trim();
   if (trimmed.length === 0) return [];
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    throw new Error("The skills CLI did not return a JSON list.");
-  }
+  const parsed = parseJson(trimmed);
+  if (parsed === null) throw new Error("The skills CLI did not return a JSON list.");
   if (!Array.isArray(parsed)) return [];
 
   const skills: CliSkill[] = [];
   for (const item of parsed) {
-    if (typeof item !== "object" || item === null) continue;
-    const record = item as Record<string, unknown>;
-    const name = asString(record.name);
-    const path = asString(record.path);
-    if (!name || !path) continue;
+    const record = asObject(item);
+    if (record === null) continue;
+    const name = asText(record.name);
+    const path = asText(record.path);
+    if (name === null || path === null) continue;
     skills.push({
       name,
       path,
       scope: record.scope === "global" ? "global" : "project",
-      agents: Array.isArray(record.agents)
-        ? record.agents.filter((a): a is string => typeof a === "string")
-        : [],
-      source: asString(record.source),
-      sourceUrl: asString(record.sourceUrl),
-      sourceType: asString(record.sourceType),
+      agents: asTextList(record.agents),
+      source: asText(record.source),
+      sourceUrl: asText(record.sourceUrl),
+      sourceType: asText(record.sourceType),
     });
   }
   return skills;

@@ -5,7 +5,7 @@ gitleaks = "latest"
 actionlint = "1.7.12"
 zizmor = "1.26.1"
 zig = "0.16.0"
-"npm:oxlint" = "latest"
+"npm:oxlint" = "1.79.0"
 "npm:oxfmt" = "latest"
 
 [env]

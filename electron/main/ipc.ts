@@ -3,21 +3,11 @@ import { parse } from "node:path";
 import { app, ipcMain, type BrowserWindow } from "electron";
 import { resolveCliPath, VENDORED_CLI_VERSION } from "./cli/paths.ts";
 import { failureMessage, runCli, succeeded, type OutputChunk, type RunResult } from "./cli/run.ts";
+import { asObject, asText, type JsonValue } from "./read/json.ts";
 import { collectInventory, type Inventory } from "./read/collect.ts";
 import { discoverProjects, type ProjectRow } from "./read/projects.ts";
 import { buildSnapshot, emptySnapshot, type Snapshot } from "./snapshot.ts";
-
-export const INVOKE_CHANNEL = "skillmanager:invoke";
-export const OUTPUT_CHANNEL = "skillmanager:output";
-
-export interface VersionInfo {
-  app: string;
-  cli: string;
-  cliPath: string;
-  pinned: string;
-}
-
-type Payload = Record<string, unknown> | undefined;
+import { INVOKE_CHANNEL, OUTPUT_CHANNEL, type BridgeResult } from "../shared/contract.ts";
 
 interface UiState {
   projects: ProjectRow[];
@@ -58,9 +48,9 @@ function cliPath(): string {
   });
 }
 
-function stringField(payload: Payload, name: string): string {
-  const value = payload?.[name];
-  return typeof value === "string" ? value : "";
+/** Read one named string from a command payload. The payload is external input. */
+function stringField(payload: JsonValue, name: string): string {
+  return asText(asObject(payload)?.[name]) ?? "";
 }
 
 /**
@@ -149,8 +139,8 @@ async function reload(window: BrowserWindow | null): Promise<Snapshot> {
 async function dispatch(
   window: BrowserWindow | null,
   command: string,
-  payload: Payload,
-): Promise<VersionInfo | Snapshot | null> {
+  payload: JsonValue,
+): Promise<BridgeResult> {
   switch (command) {
     case "skillmanager.version":
       return {
@@ -192,7 +182,7 @@ async function dispatch(
 }
 
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
-  ipcMain.handle(INVOKE_CHANNEL, async (_event, command: string, payload: Payload) =>
+  ipcMain.handle(INVOKE_CHANNEL, async (_event, command: string, payload: JsonValue) =>
     dispatch(getWindow(), command, payload),
   );
 }
